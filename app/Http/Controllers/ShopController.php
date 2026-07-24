@@ -1,0 +1,47 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Product;
+use App\Models\SystemSetting;
+use Inertia\Inertia;
+
+class ShopController extends Controller
+{
+    public function index()
+    {
+        $products = Product::with('variants.ingredients')
+            ->where('is_active', true)
+            ->orderBy('category')
+            ->get();
+
+        // Pobieramy minimalne zamówienie za pomocą Twojego modelu SystemSetting
+        $minOrderAmount = (float) SystemSetting::get('min_order_amount', 40.00);
+
+        return Inertia::render('Shop/Index', [
+            'products'       => $products,
+            'minOrderAmount' => $minOrderAmount,
+        ]);
+    }
+
+    /**
+     * Wyświetla publiczną stronę śledzenia statusu zamówienia na żywo.
+     */
+    public function orderStatus(string $token)
+    {
+        $order = \App\Models\Order::with([
+                'items.variant.product',
+                'items.modifiers.ingredient',
+                'deliveryZone'
+            ])
+            ->where('tracking_token', $token)
+            ->firstOrFail();
+
+        $phone = \App\Models\SystemSetting::get('restaurant_phone', '+48 500 600 700');
+
+        return Inertia::render('Shop/OrderStatus', [
+            'order' => $order,
+            'restaurantPhone' => $phone,
+        ]);
+    }
+}
