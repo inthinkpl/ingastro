@@ -236,7 +236,7 @@ const scrollToSection = (id) => {
             
             <div class="relative z-20 max-w-4xl mx-auto text-center px-6 space-y-6">
                 <span class="text-xs font-black uppercase tracking-widest text-orange-500 bg-orange-950/60 backdrop-blur-md border border-orange-900/60 px-4 py-1.5 rounded-full inline-block">
-                    🇮🇹 Prawdziwa włoska receptura w Twoim mieście
+                    🇮🇹 Prawdziwa włoska receptura w Twoim mieścieee
                 </span>
                 <h1 class="text-4xl sm:text-6xl font-black uppercase tracking-tight text-white leading-none drop-shadow-md">
                     Tradycja Wypiekana <br class="hidden sm:block" />
