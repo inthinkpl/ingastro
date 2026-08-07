@@ -16,6 +16,7 @@ const props = defineProps({
     payuClientSecret: { type: String, default: '' },
     payuSecondKey: { type: String, default: '' },
     discountCodes: { type: Array, default: () => [] },
+    notificationSettings: { type: Array, default: () => [] }, // <-- DODANO PROPS DLA POWIADOMIEŃ
     availablePermissions: { type: Object, default: () => ({}) },
     rolePermissions: { type: Object, default: () => ({}) },
     authRole: { type: String, default: 'admin' }
@@ -30,11 +31,13 @@ const hasPermission = (permKey) => {
     return props.rolePermissions?.[props.authRole]?.includes(permKey) || false;
 };
 
-// Automatyczne ustawienie aktywnej zakładki przy starcie, jeśli użytkownik nie ma dostępu do 'general'
+// Automatyczne ustawienie aktywnej zakładki przy starcie
 onMounted(() => {
     if (!hasPermission('settings.general')) {
         if (hasPermission('settings.discounts')) {
             activeTab.value = 'discounts';
+        } else if (hasPermission('settings.notifications')) {
+            activeTab.value = 'notifications';
         } else if (hasPermission('settings.payments')) {
             activeTab.value = 'payments';
         }
@@ -55,6 +58,26 @@ const form = useForm({
     payu_second_key: props.payuSecondKey
 });
 
+// Formularz edycji szablonów powiadomień Web Push
+const pushForm = useForm({
+    settings: props.notificationSettings || []
+});
+
+// Szybkie wstawianie tagów w formularzu powiadomień
+const insertTag = (index, tag) => {
+    if (pushForm.settings[index]) {
+        pushForm.settings[index].body_template += ` ${tag}`;
+    }
+};
+
+// Zapis szablonów powiadomień Push
+const savePushSettings = () => {
+    pushForm.put(route('admin.settings.notifications.update'), {
+        preserveScroll: true,
+        onSuccess: () => alert('Szablony powiadomień Web Push zostały pomyślnie zapisane!')
+    });
+};
+
 // Formularz dodawania nowego kodu rabatowego
 const discountForm = useForm({
     code: '',
@@ -66,7 +89,7 @@ const discountForm = useForm({
 
 // Inicjalizacja macierzy uprawnień dla poszczególnych ról
 const permissionsMatrix = ref({
-    manager: props.rolePermissions?.manager || ['settings.general', 'settings.discounts', 'products.manage', 'inventory.manage', 'reconciliation.view', 'delivery_zones.manage'],
+    manager: props.rolePermissions?.manager || ['settings.general', 'settings.discounts', 'settings.notifications', 'products.manage', 'inventory.manage', 'reconciliation.view', 'delivery_zones.manage'],
     staff: props.rolePermissions?.staff || [],
     chef: props.rolePermissions?.chef || [],
     driver: props.rolePermissions?.driver || []
@@ -137,7 +160,7 @@ const deleteDiscountCode = (id) => {
             <!-- NAGŁÓWEK PANELU ADMINA -->
             <header class="border-b border-slate-800 pb-4">
                 <h1 class="text-xl font-black text-orange-400 uppercase tracking-wider">Ustawienia Globalne Systemu</h1>
-                <p class="text-xs text-slate-500 mt-0.5">Centrum konfiguracji parametrów pizzerii, promocji, bramek płatności i uprawnień.</p>
+                <p class="text-xs text-slate-500 mt-0.5">Centrum konfiguracji parametrów pizzerii, promocji, powiadomień push, bramek płatności i uprawnień.</p>
             </header>
 
             <!-- 🎛️ POD-MENU / POD-NAWIGACJA (TABS) Z WARUNKOWYM DOSTĘPEM -->
@@ -152,7 +175,7 @@ const deleteDiscountCode = (id) => {
                         : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-850'"
                     class="px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider font-bold border transition-all flex items-center space-x-2"
                 >
-                    <span>📍</span> <span>Wizytówka i Zasady Zamówień</span>
+                    <span>📍</span> <span>Wizytówka i Zasady</span>
                 </button>
 
                 <!-- Zakładka 2: Kody Rabatowe -->
@@ -170,7 +193,19 @@ const deleteDiscountCode = (id) => {
                     </span>
                 </button>
 
-                <!-- Zakładka 3: Konfiguracja Płatności -->
+                <!-- Zakładka 3: Powiadomienia Push -->
+                <button 
+                    v-if="hasPermission('settings.notifications')"
+                    @click="activeTab = 'notifications'"
+                    :class="activeTab === 'notifications' 
+                        ? 'bg-orange-600 text-white font-black border-orange-500 shadow-lg shadow-orange-950/40' 
+                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-850'"
+                    class="px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider font-bold border transition-all flex items-center space-x-2"
+                >
+                    <span>🔔</span> <span>Powiadomienia Push</span>
+                </button>
+
+                <!-- Zakładka 4: Konfiguracja Płatności -->
                 <button 
                     v-if="hasPermission('settings.payments')"
                     @click="activeTab = 'payments'"
@@ -179,10 +214,10 @@ const deleteDiscountCode = (id) => {
                         : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-850'"
                     class="px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider font-bold border transition-all flex items-center space-x-2"
                 >
-                    <span>💳</span> <span>Konfiguracja Płatności</span>
+                    <span>💳</span> <span>Płatności</span>
                 </button>
 
-                <!-- Zakładka 4: Macierz Uprawnień Ról (Dostępna tylko dla Admina) -->
+                <!-- Zakładka 5: Macierz Uprawnień Ról (Admin) -->
                 <button 
                     v-if="authRole === 'admin'"
                     @click="activeTab = 'permissions'"
@@ -191,7 +226,7 @@ const deleteDiscountCode = (id) => {
                         : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-850'"
                     class="px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider font-bold border transition-all flex items-center space-x-2"
                 >
-                    <span>🔐</span> <span>Macierz Uprawnień Ról</span>
+                    <span>🔐</span> <span>Uprawnienia Ról</span>
                 </button>
             </div>
 
@@ -249,7 +284,6 @@ const deleteDiscountCode = (id) => {
                         </div>
                     </div>
 
-                    <!-- STOPKA Z ZAPISEM -->
                     <div class="flex justify-end pt-4 border-t border-slate-850">
                         <button 
                             type="submit" 
@@ -270,7 +304,6 @@ const deleteDiscountCode = (id) => {
                     <span>🎟️</span> <span>Generowanie i Zarządzanie KODAMI RABATOWYMI</span>
                 </h2>
 
-                <!-- FORMULARZ TWORZENIA KODU -->
                 <form @submit.prevent="createDiscountCode" class="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-4">
                     <h3 class="font-bold text-orange-400 uppercase tracking-wider">Utwórz nowy kod promocyjny:</h3>
                     
@@ -315,7 +348,6 @@ const deleteDiscountCode = (id) => {
                     </div>
                 </form>
 
-                <!-- TABELA ISTNIEJĄCYCH KODÓW -->
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>
@@ -355,7 +387,6 @@ const deleteDiscountCode = (id) => {
                                     </button>
                                 </td>
                             </tr>
-
                             <tr v-if="discountCodes.length === 0">
                                 <td colspan="7" class="p-6 text-center text-slate-600 italic">
                                     Brak zdefiniowanych kodów rabatowych. Użyj formularza powyżej, aby dodać pierwszy kod!
@@ -367,7 +398,78 @@ const deleteDiscountCode = (id) => {
             </div>
 
             <!-- ========================================================================= -->
-            <!-- 💳 WIDOK 3: KONFIGURACJA PŁATNOŚCI -->
+            <!-- 🔔 WIDOK 3: POWIADOMIENIA WEB PUSH -->
+            <!-- ========================================================================= -->
+            <div v-if="activeTab === 'notifications' && hasPermission('settings.notifications')" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 shadow-xl text-xs">
+                <div class="border-b border-slate-850 pb-3">
+                    <h2 class="text-xs font-black uppercase tracking-widest text-slate-300 flex items-center space-x-2">
+                        <span>🔔</span> <span>Szablony Powiadomień Web Push w Czasie Rzeczywistym</span>
+                    </h2>
+                    <p class="text-[11px] text-slate-500 mt-1">Dostosuj komunikaty wysyłane automatycznie na telefony klientów przy zmianie statusu zamówienia na KDS i u kuriera.</p>
+                </div>
+
+                <form @submit.prevent="savePushSettings" class="space-y-4">
+                    <div v-for="(setting, index) in pushForm.settings" :key="setting.id" class="p-4 rounded-xl border border-slate-850 bg-slate-950 space-y-3">
+                        <div class="flex justify-between items-center border-b border-slate-900 pb-2">
+                            <span class="font-black text-orange-400 uppercase tracking-wider text-xs">{{ setting.status_label }}</span>
+                            <span class="text-[10px] font-mono text-slate-500 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">{{ setting.status_key }}</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-3">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tytuł powiadomienia</label>
+                                <input 
+                                    v-model="setting.title_template" 
+                                    type="text" 
+                                    class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-white font-medium focus:border-orange-500 focus:ring-0" 
+                                    required 
+                                />
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase">Treść powiadomienia</label>
+                                    <div class="flex gap-1 text-[10px]">
+                                        <span class="text-slate-500 self-center hidden sm:inline">Kliknij tag:</span>
+                                        <button 
+                                            type="button" 
+                                            v-for="tag in ['{name}', '{order_id}', '{address}', '{total}']" 
+                                            :key="tag"
+                                            @click="insertTag(index, tag)"
+                                            class="bg-slate-900 border border-slate-800 text-orange-400 hover:bg-orange-950/40 hover:border-orange-500 px-2 py-0.5 rounded font-mono text-[10px] transition-all"
+                                        >
+                                            {{ tag }}
+                                        </button>
+                                    </div>
+                                </div>
+                                <textarea 
+                                    v-model="setting.body_template" 
+                                    rows="2" 
+                                    class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-white font-medium focus:border-orange-500 focus:ring-0" 
+                                    required
+                                ></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="pushForm.settings.length === 0" class="p-6 text-center text-slate-600 italic">
+                        Brak zdefiniowanych szablonów powiadomień w bazie danych.
+                    </div>
+
+                    <div class="flex justify-end pt-4 border-t border-slate-850">
+                        <button 
+                            type="submit" 
+                            :disabled="pushForm.processing"
+                            class="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-black px-8 py-3.5 rounded-xl uppercase tracking-wider transition-all shadow-md hover:scale-102 active:scale-98 disabled:opacity-50"
+                        >
+                            {{ pushForm.processing ? 'Zapisywanie...' : '💾 Zapisz Szablony Powiadomień' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- 💳 WIDOK 4: KONFIGURACJA PŁATNOŚCI -->
             <!-- ========================================================================= -->
             <div v-if="activeTab === 'payments' && hasPermission('settings.payments')" class="space-y-6">
                 <form @submit.prevent="saveSettings" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 shadow-xl text-xs">
@@ -376,7 +478,6 @@ const deleteDiscountCode = (id) => {
                         <span>💳</span> <span>Aktywny Sterownik Płatności Online</span>
                     </h2>
                     
-                    <!-- Szybki wybór bramki -->
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <label :class="form.payment_gateway === 'simulation' ? 'border-orange-500 bg-orange-950/20 shadow-md' : 'border-slate-800 bg-slate-950'" class="p-4 rounded-xl border flex items-center space-x-3 cursor-pointer transition-all select-none">
                             <input type="radio" v-model="form.payment_gateway" value="simulation" class="text-orange-600 focus:ring-0 bg-slate-950 border-slate-800" />
@@ -403,7 +504,6 @@ const deleteDiscountCode = (id) => {
                         </label>
                     </div>
 
-                    <!-- Klucze PayU -->
                     <div v-if="form.payment_gateway === 'payu'" class="space-y-4 pt-4 border-t border-slate-950/80 animate-fadeIn">
                         <div class="flex justify-between items-center">
                             <h3 class="font-black text-orange-400 uppercase tracking-wider text-[10px]">Klucze Autoryzacji PayU</h3>
@@ -437,7 +537,6 @@ const deleteDiscountCode = (id) => {
                         </div>
                     </div>
 
-                    <!-- STOPKA Z ZAPISEM -->
                     <div class="flex justify-end pt-4 border-t border-slate-850">
                         <button 
                             type="submit" 
@@ -451,7 +550,7 @@ const deleteDiscountCode = (id) => {
             </div>
 
             <!-- ========================================================================= -->
-            <!-- 🔐 WIDOK 4: MACIERZ UPRAWNIEŃ RÓL -->
+            <!-- 🔐 WIDOK 5: MACIERZ UPRAWNIEŃ RÓL -->
             <!-- ========================================================================= -->
             <div v-if="activeTab === 'permissions' && authRole === 'admin'" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 shadow-xl text-xs">
                 <div class="border-b border-slate-850 pb-3">
@@ -476,7 +575,6 @@ const deleteDiscountCode = (id) => {
                             <tr v-for="(label, key) in availablePermissions" :key="key" class="hover:bg-slate-950/40 transition-colors">
                                 <td class="p-3 font-bold text-slate-200">{{ label }}</td>
                                 
-                                <!-- Przełączniki checkbox dla ról -->
                                 <td v-for="role in ['manager', 'staff', 'chef', 'driver']" :key="role" class="p-3 text-center">
                                     <input 
                                         type="checkbox" 

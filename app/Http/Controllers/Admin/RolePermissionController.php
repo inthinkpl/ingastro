@@ -14,14 +14,15 @@ class RolePermissionController extends Controller
     public static function getAvailablePermissions(): array
     {
         return [
-            'settings.general'   => 'Wizytówka i Zasady Zamówień',
-            'settings.discounts' => 'Kody Rabatowe (Tworzenie i Edycja)',
-            'settings.payments'  => 'Konfiguracja BRAMEK PŁATNOŚCI',
-            'users.manage'       => 'Zarządzanie Pracownikami i Zespołem',
-            'products.manage'    => 'Karta Dań i Receptury BOM',
-            'inventory.manage'   => 'Gospodarka Magazynowa Surowców',
-            'reconciliation.view'=> 'Rozliczanie Gotówki Kurierów',
-            'delivery_zones.manage' => 'Strefy Dostaw i Mapy',
+            'settings.general'       => 'Wizytówka i Zasady Zamówień',
+            'settings.discounts'     => 'Kody Rabatowe (Tworzenie i Edycja)',
+            'settings.notifications' => 'Powiadomienia Web Push (Szablony KDS / Kurier)', // <-- DODANY KLUCZ UPRAWNIENIA
+            'settings.payments'      => 'Konfiguracja BRAMEK PŁATNOŚCI',
+            'users.manage'           => 'Zarządzanie Pracownikami i Zespołem',
+            'products.manage'        => 'Karta Dań i Receptury BOM',
+            'inventory.manage'       => 'Gospodarka Magazynowa Surowców',
+            'reconciliation.view'    => 'Rozliczanie Gotówki Kurierów',
+            'delivery_zones.manage'  => 'Strefy Dostaw i Mapy',
         ];
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\OrderStatusUpdated; // <-- Ddodany import zdarzenia WebSockets/Push
 use App\Models\Order;
 use App\Models\User;
 use App\Services\Delivery\RouteOptimizationService;
@@ -21,7 +22,6 @@ class DriverDeliveryController extends Controller
             ->where('type', 'dostawa')
             ->whereIn('status', ['gotowe', 'w_dostawie']);
 
-        // 🔥 POPRAWKA FILTROWANIA:
         // Jeśli zalogowany jest Menedżer lub Admin (testy), widzi WSZYSTKIE aktywne dostawy w lokalu.
         // Jeśli zwykły Kierowca, widzi zamówienia przypisane do siebie LUB jeszcze nieprzypisane do kogoś innego.
         if ($user->role === 'driver') {
@@ -61,6 +61,8 @@ class DriverDeliveryController extends Controller
             $routeService->optimizeDriverRoute($order->driver_id);
         }
 
+        event(new OrderStatusUpdated($order));
+
         return redirect()->back()->with('success', 'Odebrano pizzę z kuchni. Status zmieniony na: W dostawie.');
     }
 
@@ -79,6 +81,8 @@ class DriverDeliveryController extends Controller
             $routeService = new RouteOptimizationService();
             $routeService->optimizeDriverRoute($order->driver_id);
         }
+        
+        event(new OrderStatusUpdated($order));
 
         return redirect()->back()->with('success', 'Zamówienie dostarczone do klienta.');
     }
@@ -99,6 +103,8 @@ class DriverDeliveryController extends Controller
         // Przeliczamy ciąg tras dla nowego kierowcy
         $routeService = new RouteOptimizationService();
         $routeService->optimizeDriverRoute($validated['driver_id']);
+
+        event(new OrderStatusUpdated($order)); // Powiadomienie na żywo o przypisaniu kierowcy
 
         return redirect()->back()->with('success', "Zamówienie #{$order->id} zostało przypisane do nowego kierowcy.");
     }

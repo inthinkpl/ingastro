@@ -19,12 +19,15 @@ use App\Http\Controllers\Manager\ProductController;
 use App\Http\Controllers\Manager\DeliveryZoneController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\DriverDeliveryController;
+use App\Http\Controllers\PushSubscriptionController;
+
 
 /*
 |--------------------------------------------------------------------------
 | 1. STRONA PUBLICZNA SKLEPU & FINANSE
 |--------------------------------------------------------------------------
 */
+Route::post('/push/subscribe', [PushSubscriptionController::class, 'subscribe'])->name('push.subscribe');
 Route::get('/', [ShopController::class, 'index'])->name('shop.index');
 Route::post('/order/store', [OrderController::class, 'store'])->name('order.store');
 
@@ -51,13 +54,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', function () { return Inertia::render('Dashboard'); })->name('dashboard');
 
     /*
-     * ─── MODUŁ ADMINISTRATORA I USTAWIEŃ GLOBALYCH (Dostęp: Admin + Manager) ───
+     * ─── MODUŁ ADMINISTRATORA I USTAWIEŃ GLOBALNYCH (Dostęp: Admin + Manager) ───
      */
     Route::middleware(['role:admin,manager'])->prefix('admin')->name('admin.')->group(function () {
         
-        // Główne Ustawienia (Wizytówka, Parametry Bramki Płatności)
+        // Główne Ustawienia (Wizytówka, Powiadomienia Push, Bramki Płatności)
         Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.edit');
         Route::post('/settings', [SettingsController::class, 'save'])->name('settings.save');
+        Route::put('/settings/notifications', [SettingsController::class, 'updateNotifications'])->name('settings.notifications.update');
         
         // 🔐 Zapis Macierzy Uprawnień Ról
         Route::post('/permissions', [RolePermissionController::class, 'update'])->name('permissions.update');

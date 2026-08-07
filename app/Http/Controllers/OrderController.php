@@ -128,6 +128,8 @@ class OrderController extends Controller
         $order->update([
             'status' => $newStatus
         ]);
+        
+        event(new OrderStatusUpdated($order));
 
         // 📦 AUTOMATYKA BOM: Zdejmij surowce z magazynu, gdy status zmienia się na 'gotowe'
         if ($newStatus === 'gotowe' && $oldStatus !== 'gotowe') {

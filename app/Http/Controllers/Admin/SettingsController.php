@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\SystemSetting;
+use App\Models\NotificationSetting; // <-- DODANY IMPORT
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\DiscountCode;
@@ -15,7 +16,7 @@ class SettingsController extends Controller
     /**
      * Wyświetla panel ustawień globalnych ERP i ładuje aktualne parametry z bazy.
      */
-    public function edit(Request $request) // 🔥 Dodaj Request $request
+    public function edit(Request $request)
     {
         $savedPermissions = RolePermission::all()->groupBy('role')->map(function ($group) {
             return $group->pluck('permission')->toArray();
@@ -32,10 +33,11 @@ class SettingsController extends Controller
             'payuClientId'          => SystemSetting::get('payu_client_id', ''),
             'payuClientSecret'      => SystemSetting::get('payu_client_secret', ''),
             'payuSecondKey'         => SystemSetting::get('payu_second_key', ''),
-            'discountCodes'         => \App\Models\DiscountCode::latest()->get(),
+            'discountCodes'         => DiscountCode::latest()->get(),
+            'notificationSettings'  => NotificationSetting::all(), // <-- PRZEKAZUJEMY SZABLONY DO VUE
             'availablePermissions'  => RolePermissionController::getAvailablePermissions(),
             'rolePermissions'       => $savedPermissions,
-            'authRole'              => $request->user()->role, // 🔥 Przekazujemy rolę aktualnego użytkownika
+            'authRole'              => $request->user()->role,
         ]);
     }
 
@@ -70,5 +72,27 @@ class SettingsController extends Controller
 
         // Powrót do formularza z komunikatem sukcesu w sesji Flash
         return redirect()->back()->with('success', 'Wszystkie parametry systemowe i finansowe zostały poprawnie zabezpieczone.');
+    }
+
+    /**
+     * Zapisuje zaktualizowane szablony powiadomień Web Push.
+     */
+    public function updateNotifications(Request $request)
+    {
+        $validated = $request->validate([
+            'settings' => 'required|array',
+            'settings.*.id' => 'required|exists:notification_settings,id',
+            'settings.*.title_template' => 'required|string|max:255',
+            'settings.*.body_template' => 'required|string|max:500',
+        ]);
+
+        foreach ($validated['settings'] as $setting) {
+            NotificationSetting::where('id', $setting['id'])->update([
+                'title_template' => $setting['title_template'],
+                'body_template'  => $setting['body_template'],
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Szablony powiadomień Web Push zostały pomyślnie zaktualizowane.');
     }
 }
