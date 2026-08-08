@@ -167,6 +167,25 @@ const statusMeta = computed(() => {
                     </div>
                 </div>
 
+                        <!-- 🔔 BANER ZACHĘCAJĄCY DO WŁĄCZENIA POWIADOMIEŃ PUSH -->
+                <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-orange-950/30 border border-orange-500/30 rounded-2xl p-5 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div class="space-y-1 text-center sm:text-left">
+                        <div class="flex items-center justify-center sm:justify-start space-x-2">
+                            <span class="text-lg">📲</span>
+                            <h3 class="text-xs font-black uppercase text-orange-400 tracking-wider">
+                                Śledź status w czasie rzeczywistym
+                            </h3>
+                        </div>
+                        <p class="text-[11px] text-slate-400 leading-relaxed">
+                            Włącz powiadomienia, aby otrzymać alert na telefon, gdy pizza trafi do pieca oraz gdy kurier wyruszy pod Twój adres.
+                        </p>
+                    </div>
+
+                    <div class="shrink-0">
+                        <PushNotificationButton />
+                    </div>
+                </div>
+
                 <!-- PASEK KROKÓW POSTĘPU -->
                 <div v-if="order.status !== 'anulowane'" class="space-y-2 pt-1">
                     <div class="grid grid-cols-4 gap-2">

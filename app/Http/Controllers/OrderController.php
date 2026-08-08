@@ -9,6 +9,7 @@ use App\Actions\CreateOrderAction;
 use App\Events\OrderPlaced;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use App\Events\OrderStatusUpdated;
 
 class OrderController extends Controller
 {
