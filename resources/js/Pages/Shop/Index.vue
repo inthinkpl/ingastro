@@ -2,11 +2,16 @@
 import { ref, computed } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import axios from 'axios';
+import { 
+    Pizza, ShoppingBag, Flame, Sparkles, Phone, MapPin, Clock, 
+    Car, Store, Smartphone, Zap, Banknote, Ticket, Info, AlertTriangle, 
+    Send, ShieldCheck, X, Check, Loader2, Gift, Percent, Utensils
+} from 'lucide-vue-next';
 
 const props = defineProps({
     products: { type: Array, default: () => [] },
     ingredients: { type: Array, default: () => [] },
-    minOrderAmount: { type: Number, default: 40.00 } // Globalny próg min. zamówienia w dostawie z Ustawień
+    minOrderAmount: { type: Number, default: 40.00 }
 });
 
 // Stan koszyka i modali
@@ -17,16 +22,16 @@ const activeVariant = ref(null);
 const selectedModifiers = ref([]);
 const activeCategoryFilter = ref('Wszystko');
 
-// 🔥 STAN KODU RABATOWEGO
+// STAN KODU RABATOWEGO
 const discountCodeInput = ref('');
 const appliedDiscount = ref(null);
 const discountError = ref(null);
 const isValidatingCode = ref(false);
 
-// Dynamiczne pobieranie unikalnych kategorii z listy produktów
+// Dynamiczne kategorie
 const uniqueCategories = computed(() => ['Wszystko', ...new Set(props.products.map(p => p.category))]);
 
-// Filtrowanie produktów wg wybranej kategorii
+// Filtrowanie produktów
 const filteredProducts = computed(() => {
     if (activeCategoryFilter.value === 'Wszystko') {
         return props.products;
@@ -38,7 +43,7 @@ const filterProducts = (cat) => {
     activeCategoryFilter.value = cat;
 };
 
-// Otwieranie okna personalizacji składników (modyfikatorów)
+// Modyfikatory składników
 const openModifierModal = (product, variant) => {
     activeProduct.value = product;
     activeVariant.value = variant;
@@ -46,7 +51,6 @@ const openModifierModal = (product, variant) => {
     isModifierModalOpen.value = true;
 };
 
-// Dodawanie/usuwanie składników w modalu
 const toggleModifier = (ingredient, action) => {
     const existingIdx = selectedModifiers.value.findIndex(m => m.ingredient_id === ingredient.id);
     if (existingIdx > -1) {
@@ -65,7 +69,6 @@ const getModifierAction = (ingredientId) => {
     return found ? found.action : null;
 };
 
-// Zapis skonfigurowanej pizzy do koszyka
 const addCustomizedToCart = () => {
     cart.value.push({
         variantId: activeVariant.value.id,
@@ -87,37 +90,30 @@ const form = useForm({
     type: 'dostawa',
     payment_method: 'blik',
     delivery_address: '',
-    discount_code: '', // 🔥 Pole z kodem rabatowym
+    discount_code: '',
     items: []
 });
 
-// Wartość częściowa koszyka (przed rabatem)
 const cartSubtotal = computed(() => {
     return cart.value.reduce((sum, i) => sum + (i.price * i.quantity), 0);
 });
 
-// Wyliczona kwota zniżki
 const discountValue = computed(() => {
     if (!appliedDiscount.value) return 0.00;
-    
     if (appliedDiscount.value.type === 'percent') {
         return Math.round((cartSubtotal.value * (appliedDiscount.value.value / 100)) * 100) / 100;
     }
     return Math.min(appliedDiscount.value.value, cartSubtotal.value);
 });
 
-// Ostateczna kwota do zapłaty po rabacie
 const cartTotal = computed(() => {
     return Math.max(0, cartSubtotal.value - discountValue.value);
 });
 
-// Liczba pozycji dla indykatora w menu
 const cartItemsCount = computed(() => cart.value.reduce((sum, item) => sum + item.quantity, 0));
 
-// Ostrzeżenie o braku minimalnej kwoty zamówienia w dostawie
 const minOrderWarning = computed(() => {
     if (form.type !== 'dostawa') return null;
-    
     if (cartTotal.value < props.minOrderAmount) {
         const missing = (props.minOrderAmount - cartTotal.value).toFixed(2);
         return `Minimalna wartość zamówienia w dostawie wynosi ${props.minOrderAmount.toFixed(2)} zł. Dołóż do koszyka dania za jeszcze ${missing} zł.`;
@@ -125,10 +121,8 @@ const minOrderWarning = computed(() => {
     return null;
 });
 
-// 🔥 Funkcja sprawdzająca kod rabatowy
 const applyDiscountCode = async () => {
     if (!discountCodeInput.value) return;
-    
     discountError.value = null;
     isValidatingCode.value = true;
 
@@ -137,7 +131,6 @@ const applyDiscountCode = async () => {
             code: discountCodeInput.value,
             subtotal: cartSubtotal.value
         });
-
         appliedDiscount.value = response.data;
         form.discount_code = response.data.code;
     } catch (error) {
@@ -156,7 +149,6 @@ const removeDiscountCode = () => {
     discountError.value = null;
 };
 
-// Wysyłka zamówienia
 const checkout = () => {
     if (cart.value.length === 0 || minOrderWarning.value) return;
 
@@ -180,7 +172,6 @@ const checkout = () => {
     });
 };
 
-// Płynne przewijanie do sekcji podstron
 const scrollToSection = (id) => {
     const el = document.getElementById(id);
     if (el) {
@@ -190,466 +181,475 @@ const scrollToSection = (id) => {
 </script>
 
 <template>
-    <div class="min-h-screen bg-slate-950 text-white font-sans selection:bg-orange-600 selection:text-white">
-        
-        <!-- 1. GÓRNE MENU NAWIGACYJNE (STICKY NAVBAR) -->
-        <nav class="sticky top-0 z-50 bg-slate-950/90 backdrop-blur-md border-b border-slate-900/80 px-6 py-4 transition-all">
-            <div class="max-w-6xl mx-auto flex justify-between items-center">
-                <!-- LOGO -->
-                <div @click="scrollToSection('hero-section')" class="flex items-center space-x-2 cursor-pointer">
-                    <span class="text-2xl">🍕</span>
-                    <span class="text-lg font-black tracking-widest text-orange-500 uppercase">SAVONA</span>
-                </div>
+    <div class="bg-[#0B0F19] text-slate-300 font-sans antialiased selection:bg-red-500 selection:text-white min-h-screen">
 
-                <!-- LINKI DO PODSTRON -->
-                <div class="hidden md:flex items-center space-x-8 text-xs font-black uppercase tracking-wider text-slate-400">
-                    <button @click="scrollToSection('hero-section')" class="hover:text-orange-500 transition-colors">Strona Główna</button>
-                    <button @click="scrollToSection('about-section')" class="hover:text-orange-500 transition-colors">O Nas</button>
-                    <button @click="scrollToSection('menu-section')" class="hover:text-orange-500 transition-colors">Karta Dań</button>
-                    <button @click="scrollToSection('contact-section')" class="hover:text-orange-500 transition-colors">Kontakt</button>
-                </div>
+        <!-- NAWIGACJA (DOKŁADNIE JAK W SAVONAPIZZA.PL) -->
+        <header class="sticky top-0 z-50 bg-[#0B0F19]/90 backdrop-blur-md border-b border-slate-900 shadow-xl">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+                <a @click.prevent="scrollToSection('hero-section')" href="#" class="flex items-center space-x-2 cursor-pointer">
+                    <span class="text-2xl font-bold text-red-500 tracking-wider">SAVONA</span>
+                    <span class="text-xs bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full font-semibold">pizza</span>
+                </a>
+                
+                <nav class="hidden md:flex space-x-8 font-medium">
+                    <a @click.prevent="scrollToSection('o-nas')" href="#o-nas" class="text-slate-300 hover:text-red-500 transition cursor-pointer">O nas</a>
+                    <a @click.prevent="scrollToSection('menu')" href="#menu" class="text-slate-300 hover:text-red-500 transition cursor-pointer">Menu</a>
+                    <a @click.prevent="scrollToSection('kontakt')" href="#kontakt" class="text-slate-300 hover:text-red-500 transition cursor-pointer">Kontakt</a>
+                </nav>
 
-                <!-- MINI WSKAŹNIK KOSZYKA -->
-                <button 
-                    @click="scrollToSection('menu-section')" 
-                    class="bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-2 text-slate-200 hover:border-orange-500 transition-colors"
-                >
-                    <span>🛒 Koszyk:</span>
-                    <span class="font-mono text-orange-400 font-black bg-slate-950 px-2 py-0.5 rounded-md">
-                        {{ cartItemsCount }}
-                    </span>
-                </button>
-            </div>
-        </nav>
-
-        <!-- 2. SEKCJA HERO (BANER POWITALNY) -->
-        <section id="hero-section" class="relative bg-slate-950 py-32 md:py-48 flex items-center justify-center border-b border-slate-900/50 overflow-hidden">
-            <div class="absolute inset-0 z-0">
-                <img 
-                    src="https://inthink.pl/hero.jpg" 
-                    alt="Tradycyjny piec do pizzy" 
-                    class="h-full w-full object-cover object-center brightness-[0.50] contrast-[1.15]"
-                />
-            </div>
-            <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-slate-950/20 z-10"></div>
-            <div class="absolute inset-0 bg-black/30 z-10"></div>
-            
-            <div class="relative z-20 max-w-4xl mx-auto text-center px-6 space-y-6">
-                <span class="text-xs font-black uppercase tracking-widest text-orange-500 bg-orange-950/60 backdrop-blur-md border border-orange-900/60 px-4 py-1.5 rounded-full inline-block">
-                    🇮🇹 Prawdziwa włoska receptura w Twoim mieścieee2
-                </span>
-                <h1 class="text-4xl sm:text-6xl font-black uppercase tracking-tight text-white leading-none drop-shadow-md">
-                    Tradycja Wypiekana <br class="hidden sm:block" />
-                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600">Żywym Ogniem</span>
-                </h1>
-                <p class="text-slate-300 max-w-xl mx-auto text-sm sm:text-base font-medium drop-shadow">
-                    Nasze ciasto dojrzewa minimum 48 godzin, a sos powstaje wyłącznie z oryginalnych pomidorów San Marzano. Spróbuj różnicy.
-                </p>
-                <div class="pt-4">
-                    <button 
-                        @click="scrollToSection('menu-section')"
-                        class="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 font-black px-8 py-4 rounded-xl text-xs uppercase tracking-wider transition-all shadow-xl hover:scale-105 active:scale-95 border border-orange-500/20"
-                    >
-                        🔥 Zobacz Menu i Zamów
+                <div class="flex items-center space-x-3">
+                    <a href="tel:+48785555455" class="border border-slate-700 hover:border-slate-500 hover:text-white text-slate-300 px-3 sm:px-5 py-2.5 rounded-full font-semibold transition inline-flex items-center space-x-2 shadow-sm text-sm sm:text-base">
+                        <Phone class="w-4 h-4 text-amber-500" />
+                        <span class="hidden sm:inline">785 555 455</span>
+                    </a>
+                    
+                    <button @click="scrollToSection('menu')" class="bg-red-600 hover:bg-red-700 text-white px-4 sm:px-5 py-2.5 rounded-full font-semibold transition inline-flex items-center space-x-2 shadow-lg shadow-red-600/30 text-sm sm:text-base cursor-pointer">
+                        <ShoppingBag class="w-4 h-4" />
+                        <span>Koszyk</span>
+                        <span class="bg-amber-500 text-slate-950 text-xs px-2 py-0.5 rounded-full font-bold ml-1">
+                            {{ cartItemsCount }}
+                        </span>
                     </button>
                 </div>
             </div>
-        </section>
+        </header>
 
-        <!-- 3. PODSTRONA: O NAS -->
-        <section id="about-section" class="py-24 max-w-5xl mx-auto px-6 space-y-16 scroll-mt-20">
-            <div class="text-center space-y-3">
-                <h2 class="text-xs font-black uppercase tracking-widest text-orange-500">Nasza Filozofia</h2>
-                <p class="text-2xl sm:text-3xl font-black uppercase tracking-wider text-slate-100">Dlaczego Savona smakuje inaczej?</p>
-                <div class="h-1 w-12 bg-orange-600 mx-auto rounded-full mt-2"></div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-                <div class="space-y-6 text-sm text-slate-400 leading-relaxed font-medium">
-                    <h3 class="text-lg font-black text-slate-200 uppercase tracking-wide">Wszystko zaczyna się od cierpliwości...</h3>
-                    <p>
-                        Nie idziemy na skróty. W pizzerii Savona sercem lokalu jest tradycyjny piec szamotowy rozgrzewany do temperatury bliskiej 450 stopni Celsjusza. Nasze ciasto wyrabiane jest z włoskiej mąki <span class="text-orange-400 font-bold">Caputo Tipo 00</span>, czystej wody i minimalnej ilości drożdży.
-                    </p>
-                    <p>
-                        Zamiast przyspieszać procesy chemiczne, dajemy ciastu odpocząć przez pełne dwie doby. To właśnie powolna fermentacja sprawia, że placki są niezwykle lekkie, puszyste wewnątrz, a brzegi zdobią charakterystyczne dla pizzy neapolitańskiej tygrysie cętki przypieczenia.
-                    </p>
+        <main>
+            <!-- BANER GŁÓWNY (HERO DOKŁADNIE JAK W SAVONAPIZZA.PL) -->
+            <section id="hero-section" class="relative bg-slate-950 text-white overflow-hidden py-24 lg:py-36">
+                <div class="absolute inset-0 opacity-20">
+                    <img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=1920&auto=format&fit=crop" alt="Pyszna, świeża pizza w pizzerii Savona" class="w-full h-full object-cover">
                 </div>
-                <!-- Karty cech -->
-                <div class="grid grid-cols-1 gap-4">
-                    <div class="bg-slate-900 border border-slate-850 p-5 rounded-2xl flex items-start space-x-4">
-                        <span class="text-2xl bg-orange-950/60 p-2.5 border border-orange-900/30 rounded-xl text-orange-400">🌾</span>
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0B0F19] via-transparent to-transparent"></div>
+                
+                <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10">
+                    <div class="grid lg:grid-cols-12 gap-12 items-center">
+                        
+                        <!-- LEWA STRONA: Teksty i przyciski akcji -->
+                        <div class="lg:col-span-7 text-center lg:text-left space-y-6">
+                            <span class="text-amber-400 font-semibold tracking-widest uppercase text-sm block">Tradycja smaku od lat w Białymstoku</span>
+                            <h1 class="text-4xl md:text-6xl font-bold leading-tight text-white">
+                                Pizzeria Savona – Pyszna Pizza w Białymstoku
+                            </h1>
+                            <p class="text-lg text-slate-300 max-w-xl mx-auto lg:mx-0">
+                                Odkryj menu pełne chrupiącej pizzy, legendarnych sałatek i kultowych makaronów. Wypiekane z pasją, serwowane z miłością w samym centrum Białegostoku.
+                            </p>
+                            <div class="pt-4 flex flex-col sm:flex-row justify-center lg:justify-start gap-4">
+                                <button @click="scrollToSection('menu')" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-8 py-4 rounded-xl transition text-center shadow-lg shadow-amber-500/20 cursor-pointer">
+                                    Zobacz wybrane menu
+                                </button>
+                                <button @click="scrollToSection('menu')" class="border-2 border-slate-700 hover:border-slate-500 text-white font-semibold px-8 py-4 rounded-xl transition text-center backdrop-blur-sm bg-slate-900/40 cursor-pointer">
+                                    Zamów przez Internet
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- PRAWA STRONA: Sekcja aktualnych promocji -->
+                        <div class="lg:col-span-5 space-y-4 max-w-md mx-auto lg:mx-0 w-full">
+                            <div class="text-center lg:text-left mb-1">
+                                <span class="inline-flex items-center space-x-1.5 bg-red-600/90 text-white text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider shadow-md shadow-red-600/10">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                                    <span>Aktualne Promocje</span>
+                                </span>
+                            </div>
+                            
+                            <!-- Promocja 1 -->
+                            <div class="bg-slate-900/70 border-2 border-white/20 backdrop-blur-md p-5 rounded-2xl shadow-xl flex items-start space-x-4 hover:border-white/40 transition duration-300">
+                                <div class="bg-red-500/10 p-3 rounded-xl border border-red-500/20 text-red-500 flex-shrink-0">
+                                    <Gift class="w-6 h-6" />
+                                </div>
+                                <div class="space-y-1">
+                                    <h3 class="text-amber-400 font-bold tracking-wide uppercase text-xs">Zestaw z gratisem</h3>
+                                    <p class="text-white font-medium text-sm md:text-base leading-snug">
+                                        Kup <span class="text-amber-400 font-bold">2 dowolne pizze Maxi</span> i odbierz Coca-Colę 0,85l <span class="text-green-400 font-bold">GRATIS!</span>
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <!-- Promocja 2 -->
+                            <div class="bg-slate-900/70 border-2 border-white/20 backdrop-blur-md p-5 rounded-2xl shadow-xl flex items-start space-x-4 hover:border-white/40 transition duration-300">
+                                <div class="bg-amber-500/10 p-3 rounded-xl border border-amber-500/20 text-amber-500 flex-shrink-0">
+                                    <Percent class="w-6 h-6" />
+                                </div>
+                                <div class="space-y-1">
+                                    <h3 class="text-amber-400 font-bold tracking-wide uppercase text-xs">Uczta dla paczki</h3>
+                                    <p class="text-white font-medium text-sm md:text-base leading-snug">
+                                        Kup <span class="text-amber-400 font-bold">trzy dowolne pizze Maxi</span>, a najtańszą dostaniesz aż <span class="text-red-400 font-bold">50% TANIEJ!</span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+            </section>
+
+            <!-- KAFELKI Z ADRESAMI LOKALI POD HERO BANEREM -->
+            <section class="relative z-20 -mt-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-2xl backdrop-blur-md flex items-center space-x-4 hover:border-red-500/40 transition duration-300">
+                        <div class="bg-red-500/10 p-3.5 rounded-xl text-red-500 flex-shrink-0">
+                            <MapPin class="w-6 h-6" />
+                        </div>
                         <div>
-                            <h4 class="font-bold text-xs uppercase text-slate-200 tracking-wide">Importowane Składniki</h4>
-                            <p class="text-xs text-slate-400 mt-1">Oryginalna Mozzarella di Bufala Campana, Prosciutto di Parma oraz oliwy Extra Vergine.</p>
+                            <h3 class="text-white font-bold text-base md:text-lg">Pizzeria Savona Legionowa</h3>
+                            <p class="text-slate-400 text-xs md:text-sm mt-0.5">ul. Legionowa 9/1, 15-369 Białystok</p>
                         </div>
                     </div>
-                    <div class="bg-slate-900 border border-slate-850 p-5 rounded-2xl flex items-start space-x-4">
-                        <span class="text-2xl bg-orange-950/60 p-2.5 border border-orange-900/30 rounded-xl text-orange-400">🪵</span>
+                    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-2xl backdrop-blur-md flex items-center space-x-4 hover:border-amber-500/40 transition duration-300">
+                        <div class="bg-amber-500/10 p-3.5 rounded-xl text-amber-500 flex-shrink-0">
+                            <MapPin class="w-6 h-6" />
+                        </div>
                         <div>
-                            <h4 class="font-bold text-xs uppercase text-slate-200 tracking-wide">Prawdziwy Szamot</h4>
-                            <p class="text-xs text-slate-400 mt-1">Wypiek trwa zaledwie 60-90 sekund w potężnym żarze, co blokuje wilgoć wewnątrz składników.</p>
+                            <h3 class="text-white font-bold text-base md:text-lg">Pizzeria Primo Savona</h3>
+                            <p class="text-slate-400 text-xs md:text-sm mt-0.5">Rynek Kościuszki 8/1, 15-426 Białystok</p>
                         </div>
                     </div>
                 </div>
-            </div>
-        </section>
+            </section>
 
-        <!-- 4. PODSTRONA: KARTA DAŃ I SKLEP -->
-        <section id="menu-section" class="max-w-6xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-8 scroll-mt-20 border-t border-slate-900 pt-20">
-            
-            <!-- LEWA STRONA: LISTA POTRAW -->
-            <div class="lg:col-span-2 space-y-6">
-                <div class="border-b border-slate-900 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                        <h2 class="text-xl font-black tracking-wider text-orange-400 uppercase">Karta Dań i Sklep</h2>
-                        <p class="text-[11px] text-slate-500 font-medium">Kliknij wybrany wariant, by dostosować dodatki lub wykluczyć składniki.</p>
+            <!-- O NAS / LOKALNE SEO -->
+            <section id="o-nas" class="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 scroll-mt-20">
+                <div class="grid md:grid-cols-2 gap-12 items-center">
+                    <div class="space-y-4">
+                        <h2 class="text-3xl font-bold text-white">Kultowa Pizzeria w Białymstoku</h2>
+                        <p class="text-slate-400 leading-relaxed">
+                            Pizzeria Savona przy <strong class="text-amber-400">ul. Legionowej 9/1 oraz ul. Rynek Kościuszki 8 lok 1</strong> to miejsce, które na stałe wpisało się w kulinarną mapę Białegostoku. Naszą specjalnością jest nie tylko idealnie wypieczona pizza, ale również unikalne kompozycje smakowe, które pokochali białostoczanie.
+                        </p>
+                        <p class="text-slate-400 leading-relaxed">
+                            Używamy wyłącznie świeżych składników, dbając o oryginalne receptury. Niezależnie od tego, czy odwiedzasz nas osobiście, czy zamawiasz na dowóz – gwarantujemy najwyższą jakość i wyjątkowy, tradycyjny smak.
+                        </p>
                     </div>
                     
-                    <!-- Filtry kategorii -->
-                    <div class="flex flex-wrap gap-1.5">
-                        <button 
-                            v-for="cat in uniqueCategories" 
-                            :key="cat"
-                            @click="filterProducts(cat)"
-                            :class="activeCategoryFilter === cat ? 'bg-orange-600 text-white font-bold border-orange-500' : 'bg-slate-900 text-slate-400 border-slate-800'"
-                            class="px-3 py-1.5 rounded-lg text-[10px] uppercase font-black tracking-wider border transition-all"
-                        >
-                            {{ cat }}
-                        </button>
+                    <div class="bg-slate-900 p-4 sm:p-6 rounded-2xl shadow-2xl border border-slate-800 grid grid-cols-2 gap-3 sm:gap-4 text-center">
+                        <div class="p-3 bg-[#0B0F19] rounded-xl border border-slate-800/50 flex flex-col justify-center min-h-[90px]">
+                            <span class="block text-2xl sm:text-3xl font-bold text-red-500">100%</span>
+                            <span class="text-[11px] sm:text-xs text-slate-400 font-medium uppercase tracking-wider mt-1 block leading-tight">Świeże Składniki</span>
+                        </div>
+                        <div class="p-3 bg-[#0B0F19] rounded-xl border border-slate-800/50 flex flex-col justify-center min-h-[90px]">
+                            <span class="block text-2xl sm:text-3xl font-bold text-red-500">Savona</span>
+                            <span class="text-[11px] sm:text-xs text-slate-400 font-medium uppercase tracking-wider mt-1 block leading-tight">Serce Białegostoku</span>
+                        </div>
+                        <div class="p-3 bg-[#0B0F19] rounded-xl border border-slate-800/50 flex flex-col justify-center min-h-[90px]">
+                            <span class="block text-2xl sm:text-3xl font-bold text-red-500">Gorąca</span>
+                            <span class="text-[11px] sm:text-xs text-slate-400 font-medium uppercase tracking-wider mt-1 block leading-tight">Szybka Dostawa</span>
+                        </div>
+                        <div class="p-3 bg-[#0B0F19] rounded-xl border border-slate-800/50 flex flex-col justify-center min-h-[90px]">
+                            <span class="block text-2xl sm:text-3xl font-bold text-red-500">Kultowa</span>
+                            <span class="text-[11px] sm:text-xs text-slate-400 font-medium uppercase tracking-wider mt-1 block leading-tight">Sałatka Paryska</span>
+                        </div>
                     </div>
                 </div>
-                
-                <!-- Siatka produktów z opisami i zdjęciami -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div v-for="product in filteredProducts" :key="product.id" class="bg-slate-900 border border-slate-850/60 rounded-2xl overflow-hidden flex flex-col justify-between hover:border-slate-800 transition-all shadow-md group">
+            </section>
+
+            <!-- KARTA DAŃ I INTERAKTYWNY SKLEP (INTERFEJS SKLEPU) -->
+            <section id="menu" class="py-16 bg-slate-950/40 border-t border-b border-slate-900 scroll-mt-20">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    
+                    <div class="text-center max-w-3xl mx-auto mb-12 space-y-3">
+                        <span class="text-red-500 font-semibold uppercase tracking-wider text-sm">Nasze Specjały</span>
+                        <h2 class="text-3xl md:text-4xl font-bold text-white">Wybrane pozycje z menu Savony</h2>
+                        <p class="text-slate-400">
+                            Wybierz wariant rozmiaru, dostosuj dodatki i złóż zamówienie bezpośrednio online.
+                        </p>
+
+                        <!-- Filtry kategorii -->
+                        <div class="flex flex-wrap justify-center gap-2 pt-4">
+                            <button 
+                                v-for="cat in uniqueCategories" 
+                                :key="cat"
+                                @click="filterProducts(cat)"
+                                :class="activeCategoryFilter === cat ? 'bg-red-600 text-white font-bold border-red-500' : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'"
+                                class="px-4 py-2 rounded-xl text-xs uppercase font-bold tracking-wider border transition-all cursor-pointer"
+                            >
+                                {{ cat }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- KARTY PRODUKTÓW ORAZ KOSZYK -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                         
-                        <!-- Miniaturka z bazy danych -->
-                        <div class="h-44 w-full bg-slate-950 relative overflow-hidden shrink-0 border-b border-slate-850">
-                            <img 
-                                v-if="product.image_path" 
-                                :src="'/storage/' + product.image_path" 
-                                :alt="product.name" 
-                                class="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                            />
-                            <div v-else class="h-full w-full flex flex-col items-center justify-center text-slate-700 bg-gradient-to-b from-slate-900 to-slate-950">
-                                <span class="text-4xl">🍕</span>
-                                <span class="text-[9px] uppercase font-bold text-slate-600 mt-2">Wypiek Rzemieślniczy</span>
+                        <!-- LISTA DAŃ -->
+                        <div class="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div v-for="product in filteredProducts" :key="product.id" class="bg-slate-900 rounded-2xl overflow-hidden shadow-xl border border-slate-800 hover:border-slate-700 transition group flex flex-col justify-between">
+                                
+                                <div>
+                                    <!-- Zdjęcie -->
+                                    <div class="h-52 overflow-hidden relative bg-slate-950">
+                                        <img 
+                                            v-if="product.image_path" 
+                                            :src="'/storage/' + product.image_path" 
+                                            :alt="product.name" 
+                                            class="w-full h-full object-cover group-hover:scale-105 transition duration-500 opacity-90 group-hover:opacity-100"
+                                        />
+                                        <div v-else class="h-full w-full flex flex-col items-center justify-center text-slate-600 bg-slate-950">
+                                            <Pizza class="w-12 h-12 text-slate-700" />
+                                            <span class="text-[9px] uppercase font-bold text-slate-600 mt-2">Wypiek Rzemieślniczy</span>
+                                        </div>
+                                        <span class="absolute top-3 right-3 bg-slate-950/80 backdrop-blur-md px-3 py-1 border border-slate-800 rounded-full uppercase text-[10px] font-bold tracking-wider text-amber-400">
+                                            {{ product.category }}
+                                        </span>
+                                    </div>
+
+                                    <!-- Treść -->
+                                    <div class="p-6 space-y-3">
+                                        <h4 class="text-xl font-bold text-white group-hover:text-amber-400 transition">{{ product.name }}</h4>
+                                        <p class="text-xs text-slate-400 leading-relaxed line-clamp-3">
+                                            {{ product.description || 'Kompozycja autorskich, świeżych składników dobrana według tradycyjnej receptury.' }}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- Warianty rozmiarów i przyciski -->
+                                <div class="p-6 pt-0 space-y-2">
+                                    <button 
+                                        v-for="variant in product.variants" 
+                                        :key="variant.id"
+                                        @click="openModifierModal(product, variant)"
+                                        class="w-full bg-slate-950 hover:bg-red-600 border border-slate-800 hover:border-red-500 text-xs py-2.5 px-3 rounded-xl transition flex justify-between items-center group/btn cursor-pointer"
+                                    >
+                                        <span class="text-slate-300 group-hover/btn:text-white font-medium">{{ variant.size_name }}</span>
+                                        <span class="font-mono font-bold text-amber-400 group-hover/btn:text-white">{{ variant.price }} zł</span>
+                                    </button>
+                                </div>
+
                             </div>
-                            <span class="absolute top-3 right-3 bg-slate-950/80 backdrop-blur-md px-2 py-0.5 border border-slate-800 rounded-md uppercase text-[9px] font-black tracking-wider text-orange-400 z-20">
-                                {{ product.category }}
-                            </span>
                         </div>
 
-                        <!-- Opis i Teksty -->
-                        <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
-                            <div>
-                                <h3 class="font-black text-slate-100 text-base uppercase tracking-wide">{{ product.name }}</h3>
-                                <p class="text-xs text-slate-400 mt-1 leading-relaxed min-h-[36px]">
-                                    {{ product.description || 'Kompozycja autorskich, świeżych składników dobrana według tradycyjnej, włoskiej sztuki kulinarnej.' }}
-                                </p>
+                        <!-- KOSZYK INTERAKTYWNY -->
+                        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 sticky top-24 shadow-2xl space-y-4">
+                            <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider border-b border-slate-800 pb-3 flex items-center justify-between">
+                                <span>Twoje Zamówienie</span>
+                                <ShoppingBag class="w-4 h-4 text-amber-500" />
+                            </h3>
+
+                            <div class="space-y-3 max-h-[35vh] overflow-y-auto pr-1">
+                                <div v-for="(item, idx) in cart" :key="idx" class="bg-[#0B0F19] p-3 rounded-xl border border-slate-800 text-xs space-y-1.5">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <div class="font-bold text-white uppercase">{{ item.name }}</div>
+                                            <div class="text-slate-400 text-[11px]">{{ item.size }} — {{ item.quantity }} szt.</div>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="font-mono font-bold text-emerald-400">{{ (item.price * item.quantity).toFixed(2) }} zł</span>
+                                            <button @click="removeFromCart(idx)" class="text-slate-500 hover:text-red-400 transition cursor-pointer">
+                                                <X class="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div v-if="item.modifiers.length > 0" class="flex flex-wrap gap-1 mt-1 pt-1 border-t border-slate-800/60">
+                                        <span 
+                                            v-for="mod in item.modifiers" 
+                                            :key="mod.ingredient_id"
+                                            :class="mod.action === 'ADD' ? 'bg-emerald-950/60 text-emerald-400 border-emerald-900' : 'bg-red-950/60 text-red-400 border-red-900'"
+                                            class="text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase"
+                                        >
+                                            {{ mod.action === 'ADD' ? 'Ekstra' : 'Bez' }} {{ mod.name }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div v-if="cart.length === 0" class="text-center py-8 text-xs text-slate-500 italic">
+                                    Koszyk jest pusty. Wybierz pozycję z menu.
+                                </div>
                             </div>
 
-                            <!-- Przyciski rozmiarów z cenami -->
-                            <div class="space-y-1.5 pt-2 border-t border-slate-950">
+                            <div v-if="cart.length > 0" class="space-y-4 pt-3 border-t border-slate-800">
+                                <!-- TYP REALIZACJI -->
+                                <div class="grid grid-cols-2 gap-2">
+                                    <button 
+                                        @click="form.type = 'dostawa'" 
+                                        :class="form.type === 'dostawa' ? 'bg-red-600 text-white border-red-500' : 'bg-[#0B0F19] text-slate-400 border-slate-800'"
+                                        class="py-2 rounded-xl text-xs font-bold border transition flex items-center justify-center space-x-1.5 cursor-pointer"
+                                    >
+                                        <Car class="w-3.5 h-3.5" />
+                                        <span>Dostawa</span>
+                                    </button>
+                                    <button 
+                                        @click="form.type = 'wynos'" 
+                                        :class="form.type === 'wynos' ? 'bg-red-600 text-white border-red-500' : 'bg-[#0B0F19] text-slate-400 border-slate-800'"
+                                        class="py-2 rounded-xl text-xs font-bold border transition flex items-center justify-center space-x-1.5 cursor-pointer"
+                                    >
+                                        <Store class="w-3.5 h-3.5" />
+                                        <span>Odbiór</span>
+                                    </button>
+                                </div>
+
+                                <div v-if="form.type === 'dostawa'" class="space-y-1">
+                                    <input 
+                                        v-model="form.delivery_address" 
+                                        type="text" 
+                                        placeholder="Adres dostawy (np. ul. Lipowa 10 m. 5)" 
+                                        class="w-full bg-[#0B0F19] border border-slate-800 focus:border-red-500 rounded-xl p-2.5 text-xs text-white placeholder:text-slate-600"
+                                        :required="form.type === 'dostawa'"
+                                    />
+                                </div>
+
+                                <p v-if="minOrderWarning" class="text-[10px] text-red-400 bg-red-950/40 p-2.5 rounded-xl border border-red-900/50 font-bold leading-relaxed flex items-center space-x-1">
+                                    <AlertTriangle class="w-3.5 h-3.5 text-red-400 shrink-0" />
+                                    <span>{{ minOrderWarning }}</span>
+                                </p>
+
+                                <!-- PŁATNOŚĆ -->
+                                <div class="grid grid-cols-3 gap-1.5">
+                                    <button 
+                                        @click="form.payment_method = 'blik'" 
+                                        :class="form.payment_method === 'blik' ? 'bg-amber-500/20 text-amber-400 border-amber-500' : 'bg-[#0B0F19] text-slate-400 border-slate-800'"
+                                        class="py-2 rounded-xl text-[10px] font-bold border transition text-center cursor-pointer"
+                                    >
+                                        BLIK
+                                    </button>
+                                    <button 
+                                        @click="form.payment_method = 'payu'" 
+                                        :class="form.payment_method === 'payu' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500' : 'bg-[#0B0F19] text-slate-400 border-slate-800'"
+                                        class="py-2 rounded-xl text-[10px] font-bold border transition text-center cursor-pointer"
+                                    >
+                                        PayU
+                                    </button>
+                                    <button 
+                                        @click="form.payment_method = 'gotówka'" 
+                                        :class="form.payment_method === 'gotówka' ? 'bg-blue-500/20 text-blue-400 border-blue-500' : 'bg-[#0B0F19] text-slate-400 border-slate-800'"
+                                        class="py-2 rounded-xl text-[10px] font-bold border transition text-center cursor-pointer"
+                                    >
+                                        Gotówka
+                                    </button>
+                                </div>
+
+                                <!-- KOD RABATOWY -->
+                                <div class="bg-[#0B0F19] p-2.5 rounded-xl border border-slate-800 space-y-2">
+                                    <div v-if="!appliedDiscount" class="flex space-x-2">
+                                        <input 
+                                            v-model="discountCodeInput" 
+                                            type="text" 
+                                            placeholder="Kod rabatowy" 
+                                            class="w-2/3 bg-slate-900 border border-slate-800 focus:border-red-500 rounded-xl px-3 py-1.5 text-xs text-white uppercase font-mono"
+                                        />
+                                        <button 
+                                            type="button"
+                                            @click="applyDiscountCode"
+                                            :disabled="!discountCodeInput || isValidatingCode"
+                                            class="w-1/3 bg-slate-800 hover:bg-red-600 disabled:opacity-50 text-white font-bold rounded-xl text-xs uppercase cursor-pointer flex items-center justify-center"
+                                        >
+                                            <Loader2 v-if="isValidatingCode" class="w-3.5 h-3.5 animate-spin" />
+                                            <span v-else>Użyj</span>
+                                        </button>
+                                    </div>
+
+                                    <div v-if="appliedDiscount" class="flex justify-between items-center text-xs">
+                                        <span class="font-mono font-bold text-emerald-400 uppercase">{{ appliedDiscount.code }}</span>
+                                        <button type="button" @click="removeDiscountCode" class="text-slate-500 hover:text-red-400 font-bold cursor-pointer">✕</button>
+                                    </div>
+                                </div>
+
+                                <!-- RAZEM -->
+                                <div class="flex justify-between items-center pt-2 border-t border-slate-800">
+                                    <span class="text-xs text-slate-300 uppercase font-bold">Do zapłaty:</span>
+                                    <span class="text-2xl font-black font-mono text-emerald-400">
+                                        {{ cartTotal.toFixed(2) }} zł
+                                    </span>
+                                </div>
+
                                 <button 
-                                    v-for="variant in product.variants" 
-                                    :key="variant.id"
-                                    @click="openModifierModal(product, variant)"
-                                    class="w-full bg-slate-950 hover:bg-orange-600 border border-slate-850 hover:border-orange-500 text-xs py-2 px-3 rounded-xl transition-all flex justify-between items-center group/btn"
+                                    @click="checkout"
+                                    :disabled="(form.type === 'dostawa' && (!form.delivery_address || minOrderWarning)) || form.processing"
+                                    class="w-full bg-red-600 hover:bg-red-700 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold py-3.5 rounded-xl text-xs uppercase tracking-wider transition shadow-lg flex items-center justify-center space-x-2 cursor-pointer"
                                 >
-                                    <span class="text-slate-400 group-hover/btn:text-white font-medium">{{ variant.size_name }}</span>
-                                    <span class="font-mono font-bold text-orange-400 group-hover/btn:text-white">{{ variant.price }} zł</span>
+                                    <Send class="w-4 h-4" />
+                                    <span>{{ form.processing ? 'Wysyłanie...' : 'Wyślij zamówienie' }}</span>
                                 </button>
                             </div>
                         </div>
 
                     </div>
-                </div>
-            </div>
 
-            <!-- PRAWA STRONA: MODUŁ KOSZYKA ZAKUPOWEGO -->
-            <div class="bg-slate-900 border border-slate-850 rounded-2xl p-6 h-max sticky top-24 shadow-xl flex flex-col">
-                <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-800 pb-2">Twoje Zamówienie</h2>
-                
-                <!-- LISTA ELEMENTÓW W KOSZYKU -->
-                <div class="space-y-3 mb-4 max-h-[35vh] overflow-y-auto pr-1">
-                    <div v-for="(item, idx) in cart" :key="idx" class="bg-slate-950 p-3 rounded-xl border border-slate-850 text-xs flex flex-col space-y-1.5">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <div class="font-bold text-slate-200 uppercase tracking-wide">{{ item.name }}</div>
-                                <div class="text-slate-500 font-medium">{{ item.size }} — {{ item.quantity }} szt.</div>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <span class="font-mono font-bold text-emerald-400">{{ (item.price * item.quantity).toFixed(2) }} zł</span>
-                                <button @click="removeFromCart(idx)" class="text-slate-600 hover:text-red-400 font-bold transition-colors">✕</button>
-                            </div>
+                </div>
+            </section>
+
+            <!-- KONTAKT (DOKŁADNIE JAK W SAVONAPIZZA.PL) -->
+            <section id="kontakt" class="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 scroll-mt-20">
+                <div class="bg-slate-900 rounded-3xl overflow-hidden text-white shadow-2xl border border-slate-800 grid md:grid-cols-2">
+                    <div class="p-8 md:p-12 space-y-8 flex flex-col justify-center">
+                        <div class="space-y-3">
+                            <span class="text-amber-400 font-semibold tracking-wider uppercase text-sm">Odwiedź nas lub zadzwoń</span>
+                            <h2 class="text-3xl font-bold">Zapraszamy do Savony!</h2>
+                            <p class="text-slate-400 text-sm">
+                                Znajdziesz nas w dogodnej lokalizacji w Białymstoku. Dbamy o to, by zamówienia na dowóz docierały gorące!
+                            </p>
                         </div>
 
-                        <!-- Modyfikatory w koszyku -->
-                        <div v-if="item.modifiers.length > 0" class="flex flex-wrap gap-1 mt-1 pt-1.5 border-t border-slate-900">
-                            <span 
-                                v-for="mod in item.modifiers" 
-                                :key="mod.ingredient_id"
-                                :class="mod.action === 'ADD' ? 'bg-emerald-950/60 text-emerald-400 border-emerald-900' : 'bg-red-950/60 text-red-400 border-red-900'"
-                                class="text-[9px] font-black px-1.5 py-0.5 rounded border uppercase"
-                            >
-                                {{ mod.action === 'ADD' ? 'Ekstra' : 'Bez' }} {{ mod.name }}
-                            </span>
+                        <div class="space-y-4 font-light text-slate-300">
+                            <div class="flex items-start space-x-3">
+                                <MapPin class="w-5 h-5 text-amber-400 mt-1 shrink-0" />
+                                <div>
+                                    <strong class="font-semibold text-white block">Adresy lokali:</strong>
+                                    <span class="text-white font-medium">Pizzeria Savona Legionowa</span><br>ul. Legionowa 9/1, 15-369 Białystok<br><br>
+                                    <span class="text-white font-medium">Pizzeria Primo Savona</span><br>Rynek Kościuszki 8/1, 15-426 Białystok
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <Phone class="w-5 h-5 text-amber-400 shrink-0" />
+                                <div>
+                                    <strong class="font-semibold text-white">Telefon: </strong>
+                                    <a href="tel:+48785555455" class="hover:text-amber-400 transition text-amber-400 font-medium">+48 785 555 455</a>
+                                </div>
+                            </div>
+                            <div class="flex items-start space-x-3">
+                                <Clock class="w-5 h-5 text-amber-400 mt-1 shrink-0" />
+                                <div>
+                                    <strong class="font-semibold text-white block">Godziny otwarcia:</strong>
+                                    Pon - Czw: 11:00 - 22:00<br>
+                                    Pt - Sob: 11:00 - 23:00<br>
+                                    Niedziela: 12:00 - 22:00
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
-                    <div v-if="cart.length === 0" class="text-center py-10 text-xs text-slate-600 italic">
-                        Twój koszyk jest pusty. Wybierz pozycję z karty dań.
+                    <div class="h-96 md:h-auto bg-[#0B0F19] relative border-t md:border-t-0 md:border-l border-slate-800 overflow-hidden">
+                        <iframe src="https://www.google.com/maps/d/embed?mid=1jZkPl1rLXnNmAGChU_ttv8vYePFnGdc&ehbc=2E312F&noprof=1" class="w-full h-full border-0"></iframe>
                     </div>
                 </div>
+            </section>
+        </main>
 
-                <!-- FORMULARZ FINALIZACJI -->
-                <div v-if="cart.length > 0" class="space-y-5 pt-4 border-t border-slate-800">
-
-                    <!-- 🛵 WYBÓR TYPU REALIZACJI -->
-                    <div class="space-y-2">
-                        <label class="block text-[11px] font-black text-slate-400 uppercase tracking-wider pl-1">
-                            🛵 Sposób realizacji zamówienia
-                        </label>
-                        
-                        <div class="flex flex-col space-y-2">
-                            <!-- Opcja: Dostawa kurierem -->
-                            <label 
-                                :class="form.type === 'dostawa' ? 'border-orange-500 bg-orange-950/20 text-white shadow-lg' : 'border-slate-850 bg-slate-950 text-slate-400 hover:bg-slate-900/60'"
-                                class="flex items-center justify-between p-3.5 border rounded-xl cursor-pointer transition-all select-none group"
-                            >
-                                <div class="flex items-center space-x-3">
-                                    <span class="text-lg bg-slate-900 p-1.5 rounded-lg border border-slate-800">🚗</span>
-                                    <div>
-                                        <span class="block text-xs font-black tracking-wide uppercase">Dostawa kurierem</span>
-                                        <span class="block text-[10px] text-slate-500 font-medium mt-0.5">Gorący wypiek pod Twoje drzwi</span>
-                                    </div>
-                                </div>
-                                <input type="radio" v-model="form.type" value="dostawa" class="hidden" />
-                                <div :class="form.type === 'dostawa' ? 'bg-orange-500 scale-100' : 'bg-transparent border border-slate-700 scale-75'" class="h-2.5 w-2.5 rounded-full transition-all duration-300"></div>
-                            </label>
-
-                            <!-- Opcja: Odbiór osobisty -->
-                            <label 
-                                :class="form.type === 'wynos' ? 'border-orange-500 bg-orange-950/20 text-white shadow-lg' : 'border-slate-850 bg-slate-950 text-slate-400 hover:bg-slate-900/60'"
-                                class="flex items-center justify-between p-3.5 border rounded-xl cursor-pointer transition-all select-none group"
-                            >
-                                <div class="flex items-center space-x-3">
-                                    <span class="text-lg bg-slate-900 p-1.5 rounded-lg border border-slate-800">🏬</span>
-                                    <div>
-                                        <span class="block text-xs font-black tracking-wide uppercase">Odbiór w pizzerii</span>
-                                        <span class="block text-[10px] text-slate-500 font-medium mt-0.5">Osobisty odbiór w lokalu</span>
-                                    </div>
-                                </div>
-                                <input type="radio" v-model="form.type" value="wynos" class="hidden" />
-                                <div :class="form.type === 'wynos' ? 'bg-orange-500 scale-100' : 'bg-transparent border border-slate-700 scale-75'" class="h-2.5 w-2.5 rounded-full transition-all duration-300"></div>
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- 📍 ADRES DOSTAWY (Tylko dla dostawy) -->
-                    <div v-if="form.type === 'dostawa'" class="p-3.5 bg-slate-950 border border-slate-850 rounded-xl space-y-1.5">
-                        <label class="block text-[10px] uppercase font-bold text-slate-400 tracking-wider pl-0.5">
-                            Adres dostawy kurierskiej
-                        </label>
-                        <input 
-                            v-model="form.delivery_address" 
-                            type="text" 
-                            placeholder="np. ul. Lipowa 10 m. 5, Białystok" 
-                            class="w-full bg-slate-900 border border-slate-800 focus:border-orange-500 rounded-xl p-3 text-xs text-white placeholder:text-slate-600 font-medium"
-                            :required="form.type === 'dostawa'"
-                        />
-                    </div>
-
-                    <!-- ℹ️ INFORMACJA O MINIMALNYM ZAMÓWIENIU -->
-                    <div v-if="form.type === 'dostawa' && !minOrderWarning" class="text-[10px] text-slate-400 bg-slate-950 p-3 rounded-xl border border-slate-850 flex items-center space-x-2">
-                        <span>ℹ️ Minimalna kwota zamówienia w dostawie: <strong class="text-orange-400 font-mono">{{ minOrderAmount.toFixed(2) }} zł</strong></span>
-                    </div>
-
-                    <!-- ⚠️ OSTRZEŻENIE O BRAKU KWOTY MINIMALNEJ -->
-                    <p v-if="minOrderWarning" class="text-[10px] text-red-400 bg-red-950/40 p-3 rounded-xl border border-red-900/50 font-bold leading-relaxed">
-                        ⚠️ {{ minOrderWarning }}
-                    </p>
-
-                    <!-- 💳 SEKCJA WYBORU PŁATNOŚCI -->
-                    <div class="space-y-2">
-                        <label class="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2 pl-1">
-                            💳 Wybierz metodę płatności
-                        </label>
-                        
-                        <div class="flex flex-col space-y-2">
-                            <!-- Opcja 1: BLIK -->
-                            <label 
-                                :class="form.payment_method === 'blik' ? 'border-orange-500 bg-orange-950/20 text-white shadow-lg' : 'border-slate-850 bg-slate-950 text-slate-400 hover:bg-slate-900/60'"
-                                class="flex items-center justify-between p-3.5 border rounded-xl cursor-pointer transition-all select-none group"
-                            >
-                                <div class="flex items-center space-x-3">
-                                    <span class="text-lg bg-slate-900 p-1.5 rounded-lg border border-slate-800">📱</span>
-                                    <span class="text-xs font-black tracking-wide uppercase">BLIK (Błyskawiczny kod)</span>
-                                </div>
-                                <input type="radio" v-model="form.payment_method" value="blik" class="hidden" />
-                                <div :class="form.payment_method === 'blik' ? 'bg-orange-500 scale-100' : 'bg-transparent border border-slate-700 scale-75'" class="h-2.5 w-2.5 rounded-full transition-all duration-300"></div>
-                            </label>
-
-                            <!-- Opcja 2: PayU -->
-                            <label 
-                                :class="form.payment_method === 'payu' ? 'border-emerald-500 bg-emerald-950/20 text-white shadow-lg' : 'border-slate-850 bg-slate-950 text-slate-400 hover:bg-slate-900/60'"
-                                class="flex items-center justify-between p-3.5 border rounded-xl cursor-pointer transition-all select-none group"
-                            >
-                                <div class="flex items-center space-x-3">
-                                    <span class="text-lg bg-slate-900 p-1.5 rounded-lg border border-slate-800">⚡</span>
-                                    <span class="text-xs font-black tracking-wide uppercase">PayU / Szybki Przelew</span>
-                                </div>
-                                <input type="radio" v-model="form.payment_method" value="payu" class="hidden" />
-                                <div :class="form.payment_method === 'payu' ? 'bg-emerald-500 scale-100' : 'bg-transparent border border-slate-700 scale-75'" class="h-2.5 w-2.5 rounded-full transition-all duration-300"></div>
-                            </label>
-
-                            <!-- Opcja 3: Gotówka przy odbiorze -->
-                            <label 
-                                :class="form.payment_method === 'gotówka' ? 'border-blue-500 bg-blue-950/20 text-white shadow-lg' : 'border-slate-850 bg-slate-950 text-slate-400 hover:bg-slate-900/60'"
-                                class="flex items-center justify-between p-3.5 border rounded-xl cursor-pointer transition-all select-none group"
-                            >
-                                <div class="flex items-center space-x-3">
-                                    <span class="text-lg bg-slate-900 p-1.5 rounded-lg border border-slate-800">💵</span>
-                                    <span class="text-xs font-black tracking-wide uppercase">Gotówka przy odbiorze</span>
-                                </div>
-                                <input type="radio" v-model="form.payment_method" value="gotówka" class="hidden" />
-                                <div :class="form.payment_method === 'gotówka' ? 'bg-blue-500 scale-100' : 'bg-transparent border border-slate-700 scale-75'" class="h-2.5 w-2.5 rounded-full transition-all duration-300"></div>
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- 🎟️ WIDGET KODU RABATOWEGO -->
-                    <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-850 space-y-2">
-                        <label class="block text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                            🎟️ Masz kod rabatowy?
-                        </label>
-
-                        <!-- Formularz wpisywania kodu -->
-                        <div v-if="!appliedDiscount" class="flex space-x-2">
-                            <input 
-                                v-model="discountCodeInput" 
-                                type="text" 
-                                placeholder="np. SAVONA10" 
-                                class="w-2/3 bg-slate-900 border border-slate-800 focus:border-orange-500 rounded-xl px-3 py-2 text-xs text-white uppercase font-mono tracking-wider placeholder:text-slate-600"
-                            />
-                            <button 
-                                type="button"
-                                @click="applyDiscountCode"
-                                :disabled="!discountCodeInput || isValidatingCode"
-                                class="w-1/3 bg-slate-800 hover:bg-orange-600 disabled:opacity-50 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all"
-                            >
-                                {{ isValidatingCode ? '...' : 'Użyj' }}
-                            </button>
-                        </div>
-
-                        <!-- Błąd walidacji -->
-                        <p v-if="discountError" class="text-[10px] text-red-400 font-bold leading-tight pt-1">
-                            ⚠️ {{ discountError }}
-                        </p>
-
-                        <!-- Po aktywowaniu kodu -->
-                        <div v-if="appliedDiscount" class="bg-emerald-950/60 border border-emerald-900 p-2.5 rounded-xl flex justify-between items-center text-xs">
-                            <div>
-                                <span class="font-mono font-black text-emerald-400 uppercase">{{ appliedDiscount.code }}</span>
-                                <span class="text-[10px] text-emerald-500 block">Zniżka aktywna!</span>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <span class="font-mono font-bold text-emerald-400">-{{ discountValue.toFixed(2) }} zł</span>
-                                <button type="button" @click="removeDiscountCode" class="text-slate-500 hover:text-red-400 font-bold">✕</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 💰 PODSUMOWANIE FINANSOWE -->
-                    <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-850 space-y-1.5">
-                        <div v-if="appliedDiscount" class="flex justify-between items-center text-xs text-slate-400">
-                            <span>Suma częściowa:</span>
-                            <span class="font-mono">{{ cartSubtotal.toFixed(2) }} zł</span>
-                        </div>
-                        <div v-if="appliedDiscount" class="flex justify-between items-center text-xs text-emerald-400 font-bold">
-                            <span>Rabat:</span>
-                            <span class="font-mono">-{{ discountValue.toFixed(2) }} zł</span>
-                        </div>
-                        <div class="flex justify-between items-center pt-1 border-t border-slate-900">
-                            <span class="text-xs text-slate-300 uppercase font-bold tracking-wider">Razem do zapłaty:</span>
-                            <span class="text-2xl font-black font-mono text-emerald-400">
-                                {{ cartTotal.toFixed(2) }} zł
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- PRZYCISK ZAMÓWIENIA Z BLOKADĄ WARUNKOWĄ -->
-                    <button 
-                        @click="checkout"
-                        :disabled="(form.type === 'dostawa' && (!form.delivery_address || minOrderWarning)) || form.processing"
-                        class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:from-slate-850 disabled:to-slate-850 disabled:text-slate-600 disabled:border disabled:border-slate-850 text-white font-black py-3.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md active:scale-98"
-                    >
-                        {{ form.processing ? 'Przetwarzanie transakcji...' : '🚀 Wyślij zamówienie do kuchni' }}
-                    </button>
-                </div>
+        <!-- STOPKA -->
+        <footer class="bg-slate-950 text-slate-500 text-xs py-8 border-t border-slate-900">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                &copy; 2026 Pizzeria Savona Białystok. Wszelkie prawa zastrzeżone.
             </div>
-        </section>
-
-        <!-- 5. PODSTRONA: KONTAKT -->
-        <section id="contact-section" class="bg-slate-900 border-t border-b border-slate-850 py-20 mt-20 scroll-mt-20">
-            <div class="max-w-5xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-                <div class="space-y-6">
-                    <div class="space-y-2">
-                        <h2 class="text-xs font-black uppercase tracking-widest text-orange-500">Zatrzymaj się u nas</h2>
-                        <p class="text-2xl font-black uppercase tracking-wide text-slate-100">Odwiedź nas osobiście</p>
-                    </div>
-                    <p class="text-xs text-slate-400 leading-relaxed font-medium">
-                        Zapraszamy do naszego lokalu, gdzie poczujesz niesamowity aromat świeżo siekanej bazylii i pieczonego ciasta. Znajdujemy się w samym centrum miasta, z dogodnym parkingiem dla gości.
-                    </p>
-                    <div class="space-y-3 text-xs">
-                        <div class="flex items-center space-x-3 text-slate-300"><span class="text-base">📍</span> <span>ul. Legionowa 10, 15-001 Białystok</span></div>
-                        <div class="flex items-center space-x-3 text-slate-300"><span class="text-base">📞</span> <span>+48 500 600 700 (rezerwacje stolików)</span></div>
-                        <div class="flex items-center space-x-3 text-slate-300"><span class="text-base">✉️</span> <span>ciao@pizzeriasavona.pl</span></div>
-                    </div>
-                </div>
-
-                <div class="bg-slate-950 border border-slate-850 p-6 rounded-2xl space-y-4 shadow-inner">
-                    <h4 class="font-black text-xs uppercase text-slate-200 tracking-wider border-b border-slate-900 pb-2">🕒 Godziny Pracy Kuchni</h4>
-                    <div class="space-y-2 text-xs">
-                        <div class="flex justify-between border-b border-slate-900 pb-1 text-slate-400"><span>Poniedziałek - Czwartek</span> <span class="font-mono font-bold text-slate-300">12:00 - 22:00</span></div>
-                        <div class="flex justify-between border-b border-slate-900 pb-1 text-slate-400"><span>Piątek - Sobota</span> <span class="font-mono font-bold text-orange-500">12:00 - 00:00</span></div>
-                        <div class="flex justify-between text-slate-400"><span>Niedziela</span> <span class="font-mono font-bold text-slate-300">13:00 - 22:00</span></div>
-                    </div>
-                    <div class="bg-orange-950/40 border border-orange-900/40 p-3 rounded-xl text-[10px] text-orange-400 font-bold leading-relaxed">
-                        ⚡ Dowozimy w promieniu lokalu! Gorąca pizza z pieca prosto pod Twoje drzwi.
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- FOOTER / STOPKA -->
-        <footer class="py-8 text-center text-slate-600 text-[10px] uppercase font-bold tracking-widest bg-slate-950">
-            &copy; 2026 Pizzeria Savona Ecosystem — Wszelkie prawa zastrzeżone.
         </footer>
 
-        <!-- MODAL PERSONALIZACJI SKŁADNIKÓW -->
+        <!-- MODAL MODYFIKACJI SKŁADNIKÓW -->
         <div v-if="isModifierModalOpen" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm z-50">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col max-h-[85vh]">
-                <div class="border-b border-slate-850 pb-3 mb-4">
-                    <h3 class="text-base font-black text-orange-400 uppercase tracking-wide">Komponujesz własną pizzę</h3>
-                    <p class="text-xs text-slate-400 font-medium">{{ activeProduct?.name }} ({{ activeVariant?.size_name }})</p>
+                <div class="border-b border-slate-800 pb-3 mb-4 flex justify-between items-start">
+                    <div>
+                        <h3 class="text-base font-bold text-amber-400 uppercase tracking-wide">Komponujesz własną pizzę</h3>
+                        <p class="text-xs text-slate-400 font-medium">{{ activeProduct?.name }} ({{ activeVariant?.size_name }})</p>
+                    </div>
+                    <button @click="isModifierModalOpen = false" class="text-slate-500 hover:text-white transition cursor-pointer">
+                        <X class="w-5 h-5" />
+                    </button>
                 </div>
 
                 <div class="overflow-y-auto space-y-2 pr-1 flex-1">
-                    <div v-for="ing in activeVariant.ingredients" :key="ing.id" class="bg-slate-950 p-2.5 rounded-xl border border-slate-850 flex justify-between items-center text-xs">
-                        <span class="font-bold text-slate-300 uppercase tracking-wide text-[11px]">{{ ing.name }}</span>
+                    <div v-for="ing in activeVariant.ingredients" :key="ing.id" class="bg-[#0B0F19] p-3 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
+                        <span class="font-bold text-slate-200 uppercase tracking-wide text-[11px]">{{ ing.name }}</span>
                         <div class="flex space-x-2">
                             <button 
                                 @click="toggleModifier(ing, 'REMOVE')"
-                                :class="getModifierAction(ing.id) === 'REMOVE' ? 'bg-red-600 text-white border-red-500' : 'bg-slate-900 text-red-400 border-slate-800'"
-                                class="px-3 py-1.5 text-[10px] font-black rounded-lg border uppercase transition-colors">
+                                :class="getModifierAction(ing.id) === 'REMOVE' ? 'bg-red-600 text-white border-red-500' : 'bg-slate-900 text-red-400 border-slate-800 hover:border-red-500'"
+                                class="px-3 py-1.5 text-[10px] font-bold rounded-lg border uppercase transition cursor-pointer"
+                            >
                                 Bez
                             </button>
                             <button 
                                 @click="toggleModifier(ing, 'ADD')"
-                                :class="getModifierAction(ing.id) === 'ADD' ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-900 text-emerald-400 border-emerald-800'"
-                                class="px-3 py-1.5 text-[10px] font-black rounded-lg border uppercase transition-colors">
+                                :class="getModifierAction(ing.id) === 'ADD' ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-900 text-emerald-400 border-slate-800 hover:border-emerald-500'"
+                                class="px-3 py-1.5 text-[10px] font-bold rounded-lg border uppercase transition cursor-pointer"
+                            >
                                 + Dodaj Extra
                             </button>
                         </div>
@@ -657,8 +657,8 @@ const scrollToSection = (id) => {
                 </div>
 
                 <div class="flex space-x-3 pt-4 border-t border-slate-800 mt-4">
-                    <button @click="isModifierModalOpen = false" class="w-1/3 bg-slate-800 py-3 rounded-xl text-xs font-bold uppercase tracking-wider text-slate-300">Anuluj</button>
-                    <button @click="addCustomizedToCart" class="w-2/3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md">
+                    <button @click="isModifierModalOpen = false" class="w-1/3 bg-slate-800 hover:bg-slate-700 py-3 rounded-xl text-xs font-bold uppercase tracking-wider text-slate-300 transition cursor-pointer">Anuluj</button>
+                    <button @click="addCustomizedToCart" class="w-2/3 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl text-xs uppercase tracking-wider transition shadow-md cursor-pointer">
                         Zatwierdź składniki
                     </button>
                 </div>
