@@ -5,7 +5,7 @@ import axios from 'axios';
 import { 
     Pizza, ShoppingBag, Phone, MapPin, Car, Store, 
     AlertTriangle, Send, X, Loader2, Utensils, Flame, Sparkles, 
-    Menu as MenuIcon, Truck, Plus
+    Menu as MenuIcon, Truck, Plus, CheckCircle2
 } from 'lucide-vue-next';
 import { useCart } from '@/Composables/useCart';
 
@@ -15,9 +15,13 @@ const props = defineProps({
     minOrderAmount: { type: Number, default: 40.00 },
     freeDeliverySettings: { 
         type: Object, 
-        default: () => ({ enabled: false, minAmount: 60.00 }) 
+        default: () => ({ enabled: true, minAmount: 60.00 }) 
     },
     upsellSettings: {
+        type: Object,
+        default: () => ({ enabled: true })
+    },
+    halfHalfSettings: {
         type: Object,
         default: () => ({ enabled: true })
     }
@@ -40,20 +44,25 @@ const freeDeliveryProgress = computed(() => {
     return Math.min(100, Math.round((cartSubtotal.value / target) * 100));
 });
 
-// Wyciąganie produktów do sekcji Upsell (Sosy, Napoje, Dodatki)
+// Wyciąganie produktów do sekcji Upsell (Sosy, Napoje, Dodatki, Desery lub produkty niebędące pizzą)
 const upsellProducts = computed(() => {
     if (!props.upsellSettings?.enabled) return [];
     
-    // Pobieramy produkty z kategorii Sosy, Napoje, Dodatki lub po prostu niebędące Pizzą
-    const categoriesToSuggest = ['sosy', 'napoje', 'dodatki', 'napój', 'sos'];
+    const categoriesToSuggest = ['sos', 'nap', 'doda', 'deser', 'sałat', 'pasta', 'drink'];
     
-    return props.products.filter(p => {
+    let matched = props.products.filter(p => {
         const catName = p.category?.toLowerCase() || '';
         return categoriesToSuggest.some(c => catName.includes(c)) && p.variants?.length > 0;
-    }).slice(0, 6); // Maksymalnie 6 pozycji
+    });
+
+    // Fallback: jeśli brak produktów z wymienionych kategorii, proponuj dowolne produkty niebędące pizzą
+    if (matched.length === 0) {
+        matched = props.products.filter(p => p.category?.toLowerCase() !== 'pizza' && p.variants?.length > 0);
+    }
+
+    return matched.slice(0, 6);
 });
 
-// Dodanie sugerowanego produktu 1-kliknięciem
 const addUpsellItem = (product) => {
     const variant = product.variants[0];
     if (!variant) return;
@@ -66,6 +75,70 @@ const addUpsellItem = (product) => {
         quantity: 1,
         modifiers: []
     });
+};
+
+// --- LOGIKA PIZZY PÓŁ NA PÓŁ ---
+const isHalfHalfModalOpen = ref(false);
+const pizzaProducts = computed(() => props.products.filter(p => p.category?.toLowerCase() === 'pizza'));
+
+const availableSizes = computed(() => {
+    const sizeMap = new Map();
+    pizzaProducts.value.forEach(p => {
+        p.variants?.forEach(v => {
+            if (!sizeMap.has(v.size_name)) {
+                sizeMap.set(v.size_name, v.size_name);
+            }
+        });
+    });
+    return Array.from(sizeMap.keys());
+});
+
+const selectedHalfHalfSize = ref('');
+const selectedLeftPizza = ref(null);
+const selectedRightPizza = ref(null);
+
+const openHalfHalfModal = () => {
+    if (availableSizes.value.length > 0) {
+        selectedHalfHalfSize.value = availableSizes.value[0];
+    }
+    selectedLeftPizza.value = pizzaProducts.value[0] || null;
+    selectedRightPizza.value = pizzaProducts.value[1] || pizzaProducts.value[0] || null;
+    isHalfHalfModalOpen.value = true;
+};
+
+const calculatedHalfHalfPrice = computed(() => {
+    if (!selectedLeftPizza.value || !selectedRightPizza.value || !selectedHalfHalfSize.value) return 0;
+
+    const leftVariant = selectedLeftPizza.value.variants?.find(v => v.size_name === selectedHalfHalfSize.value);
+    const rightVariant = selectedRightPizza.value.variants?.find(v => v.size_name === selectedHalfHalfSize.value);
+
+    const priceLeft = leftVariant ? parseFloat(leftVariant.price) : 0;
+    const priceRight = rightVariant ? parseFloat(rightVariant.price) : 0;
+
+    return Math.max(priceLeft, priceRight);
+});
+
+const addHalfHalfToCart = () => {
+    if (!selectedLeftPizza.value || !selectedRightPizza.value || !selectedHalfHalfSize.value) return;
+
+    const leftVariant = selectedLeftPizza.value.variants?.find(v => v.size_name === selectedHalfHalfSize.value);
+    const rightVariant = selectedRightPizza.value.variants?.find(v => v.size_name === selectedHalfHalfSize.value);
+
+    if (!leftVariant || !rightVariant) {
+        alert('Jeden z wybranych smaków nie posiada tego rozmiaru. Wybierz inny rozmiar.');
+        return;
+    }
+
+    addToCart({
+        variantId: leftVariant.id,
+        name: `Pizza ½ na ½ (${selectedLeftPizza.value.name} + ${selectedRightPizza.value.name})`,
+        size: selectedHalfHalfSize.value,
+        price: calculatedHalfHalfPrice.value,
+        quantity: 1,
+        modifiers: []
+    });
+
+    isHalfHalfModalOpen.value = false;
 };
 
 // Stan modali i nawigacji mobilnej
@@ -82,7 +155,6 @@ const appliedDiscount = ref(null);
 const discountError = ref(null);
 const isValidatingCode = ref(false);
 
-// Dynamiczne kategorie
 const uniqueCategories = computed(() => ['Wszystko', ...new Set(props.products.map(p => p.category))]);
 
 const getCategoryIcon = (cat) => {
@@ -97,7 +169,6 @@ const getCategoryIcon = (cat) => {
     }
 };
 
-// Filtrowanie produktów
 const filteredProducts = computed(() => {
     if (activeCategoryFilter.value === 'Wszystko') return props.products;
     return props.products.filter(p => p.category === activeCategoryFilter.value);
@@ -107,7 +178,6 @@ const filterProducts = (cat) => {
     activeCategoryFilter.value = cat;
 };
 
-// Modyfikacja składników dozwolona TYLKO dla kategorii Pizza
 const handleVariantSelect = (product, variant) => {
     const isPizza = product.category?.toLowerCase() === 'pizza';
     const hasIngredients = variant.ingredients && variant.ingredients.length > 0;
@@ -126,7 +196,6 @@ const handleVariantSelect = (product, variant) => {
     }
 };
 
-// Modyfikatory składników
 const openModifierModal = (product, variant) => {
     activeProduct.value = product;
     activeVariant.value = variant;
@@ -191,6 +260,34 @@ const minOrderWarning = computed(() => {
     }
     return null;
 });
+
+const applyDiscountCode = async () => {
+    if (!discountCodeInput.value) return;
+    discountError.value = null;
+    isValidatingCode.value = true;
+
+    try {
+        const response = await axios.post(route('discount.validate'), {
+            code: discountCodeInput.value,
+            subtotal: cartSubtotal.value
+        });
+        appliedDiscount.value = response.data;
+        form.discount_code = response.data.code;
+    } catch (error) {
+        appliedDiscount.value = null;
+        form.discount_code = '';
+        discountError.value = error.response?.data?.message || 'Błąd kodu.';
+    } finally {
+        isValidatingCode.value = false;
+    }
+};
+
+const removeDiscountCode = () => {
+    appliedDiscount.value = null;
+    discountCodeInput.value = '';
+    form.discount_code = '';
+    discountError.value = null;
+};
 
 const checkout = () => {
     if (cart.value.length === 0 || minOrderWarning.value) return;
@@ -291,6 +388,7 @@ const scrollToSection = (id) => {
                     </div>
                 </div>
 
+                <!-- KAFELKI KATEGORII -->
                 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                     <button 
                         v-for="cat in uniqueCategories" 
@@ -305,6 +403,25 @@ const scrollToSection = (id) => {
                         <span class="font-bold text-xs uppercase tracking-wider">{{ cat }}</span>
                     </button>
                 </div>
+            </div>
+
+            <!-- BANER SKOMPONUJ PIZZĘ PÓŁ NA PÓŁ -->
+            <div v-if="halfHalfSettings?.enabled" class="bg-gradient-to-r from-amber-500/10 via-red-600/10 to-amber-500/10 border border-amber-500/30 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+                <div class="flex items-center space-x-4">
+                    <div class="p-3 bg-amber-500/20 border border-amber-500/40 text-amber-400 rounded-2xl shrink-0">
+                        <Pizza class="w-8 h-8" />
+                    </div>
+                    <div>
+                        <h3 class="text-base sm:text-lg font-black text-white uppercase tracking-wide">Nie możesz się zdecydować? Stwórz Pizzę Pół na Pół! 🍕🍕</h3>
+                        <p class="text-xs text-slate-300 mt-0.5">Połącz dwa dowolne smaki na jednej pizzy. Cena zostanie automatycznie obliczona.</p>
+                    </div>
+                </div>
+                <button 
+                    @click="openHalfHalfModal"
+                    class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-6 py-3 rounded-xl text-xs uppercase tracking-wider transition cursor-pointer shrink-0 shadow-lg"
+                >
+                    Skomponuj Pół na Pół
+                </button>
             </div>
 
             <!-- SIATKA DAŃ ORAZ KOSZYK BOCZNY -->
@@ -506,6 +623,84 @@ const scrollToSection = (id) => {
             </div>
 
         </main>
+
+        <!-- MODAL KONFIGURATORA PIZZY PÓŁ NA PÓŁ -->
+        <div v-if="isHalfHalfModalOpen" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm z-50">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
+                <div class="border-b border-slate-800 pb-3 mb-4 flex justify-between items-start">
+                    <div>
+                        <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wide flex items-center space-x-1.5">
+                            <Pizza class="w-4 h-4" />
+                            <span>Konfigurator Pizzy Pół na Pół</span>
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Wybierz rozmiar oraz dwa smaki, które chcesz połączyć.</p>
+                    </div>
+                    <button @click="isHalfHalfModalOpen = false" class="text-slate-500 hover:text-white transition cursor-pointer">
+                        <X class="w-5 h-5" />
+                    </button>
+                </div>
+
+                <div class="overflow-y-auto space-y-5 pr-1 flex-1">
+                    <div class="space-y-2">
+                        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wide">1. Wybierz Rozmiar:</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button 
+                                v-for="size in availableSizes" 
+                                :key="size"
+                                @click="selectedHalfHalfSize = size"
+                                :class="selectedHalfHalfSize === size ? 'bg-amber-500 text-slate-950 font-black border-amber-500' : 'bg-[#0B0F19] text-slate-300 border-slate-800 hover:border-slate-700'"
+                                class="p-2.5 rounded-xl border text-xs uppercase font-bold transition cursor-pointer text-center"
+                            >
+                                {{ size }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wide">2. Pierwsza Połówka (Lewa Strona):</label>
+                        <select 
+                            v-model="selectedLeftPizza"
+                            class="w-full bg-[#0B0F19] border border-slate-800 focus:border-amber-500 rounded-xl p-2.5 text-xs text-white uppercase font-bold"
+                        >
+                            <option v-for="p in pizzaProducts" :key="p.id" :value="p">
+                                {{ p.name }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wide">3. Druga Połówka (Prawa Strona):</label>
+                        <select 
+                            v-model="selectedRightPizza"
+                            class="w-full bg-[#0B0F19] border border-slate-800 focus:border-amber-500 rounded-xl p-2.5 text-xs text-white uppercase font-bold"
+                        >
+                            <option v-for="p in pizzaProducts" :key="p.id" :value="p">
+                                {{ p.name }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="bg-[#0B0F19] p-4 rounded-xl border border-slate-800 space-y-2">
+                        <span class="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Podsumowanie Twojej Pizzy:</span>
+                        <div class="text-xs text-white font-bold flex justify-between items-center">
+                            <span>½ {{ selectedLeftPizza?.name || '---' }} + ½ {{ selectedRightPizza?.name || '---' }}</span>
+                        </div>
+                        <div class="text-xs text-slate-400 flex justify-between items-center pt-1 border-t border-slate-800">
+                            <span>Rozmiar: <strong class="text-slate-200">{{ selectedHalfHalfSize }}</strong></span>
+                            <span class="text-base font-black font-mono text-emerald-400">{{ calculatedHalfHalfPrice.toFixed(2) }} zł</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex space-x-3 pt-4 border-t border-slate-800 mt-4">
+                    <button @click="isHalfHalfModalOpen = false" class="w-1/3 bg-slate-800 hover:bg-slate-700 py-2.5 rounded-xl text-xs font-bold uppercase text-slate-300 transition cursor-pointer">Anuluj</button>
+                    <button @click="addHalfHalfToCart" class="w-2/3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-2.5 rounded-xl text-xs uppercase transition shadow-md cursor-pointer flex items-center justify-center space-x-1.5">
+                        <CheckCircle2 class="w-4 h-4" />
+                        <span>Dodaj Pół na Pół do koszyka</span>
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <!-- MODAL MODYFIKACJI SKŁADNIKÓW -->
         <div v-if="isModifierModalOpen" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm z-50">

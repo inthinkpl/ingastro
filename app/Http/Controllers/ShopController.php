@@ -19,7 +19,7 @@ class ShopController extends Controller
         $minOrderAmount = (float) SystemSetting::get('min_order_amount', 40.00);
 
         $freeDeliverySettings = [
-            'enabled'   => filter_var(SystemSetting::get('free_delivery_enabled', '0'), FILTER_VALIDATE_BOOLEAN),
+            'enabled'   => filter_var(SystemSetting::get('free_delivery_enabled', '1'), FILTER_VALIDATE_BOOLEAN),
             'minAmount' => (float) SystemSetting::get('free_delivery_min_amount', 60.00),
         ];
 
@@ -27,11 +27,16 @@ class ShopController extends Controller
             'enabled'   => filter_var(SystemSetting::get('upsell_enabled', '1'), FILTER_VALIDATE_BOOLEAN),
         ];
 
+        $halfHalfSettings = [
+            'enabled'   => filter_var(SystemSetting::get('half_half_enabled', '1'), FILTER_VALIDATE_BOOLEAN),
+        ];
+
         return Inertia::render('Shop/Index', [
             'products'             => $products,
             'minOrderAmount'       => $minOrderAmount,
             'freeDeliverySettings' => $freeDeliverySettings,
             'upsellSettings'       => $upsellSettings,
+            'halfHalfSettings'     => $halfHalfSettings,
         ]);
     }
 
@@ -64,7 +69,7 @@ class ShopController extends Controller
         $minOrderAmount = (float) SystemSetting::get('min_order_amount', 40.00);
 
         $freeDeliverySettings = [
-            'enabled'   => filter_var(SystemSetting::get('free_delivery_enabled', '0'), FILTER_VALIDATE_BOOLEAN),
+            'enabled'   => filter_var(SystemSetting::get('free_delivery_enabled', '1'), FILTER_VALIDATE_BOOLEAN),
             'minAmount' => (float) SystemSetting::get('free_delivery_min_amount', 60.00),
         ];
 
@@ -72,12 +77,17 @@ class ShopController extends Controller
             'enabled'   => filter_var(SystemSetting::get('upsell_enabled', '1'), FILTER_VALIDATE_BOOLEAN),
         ];
 
-        return Inertia::render('Shop/Menu.vue', [
+        $halfHalfSettings = [
+            'enabled'   => filter_var(SystemSetting::get('half_half_enabled', '1'), FILTER_VALIDATE_BOOLEAN),
+        ];
+
+        return Inertia::render('Shop/Menu', [
             'products'             => $products,
             'ingredients'          => $ingredients,
             'minOrderAmount'       => $minOrderAmount,
             'freeDeliverySettings' => $freeDeliverySettings,
             'upsellSettings'       => $upsellSettings,
+            'halfHalfSettings'     => $halfHalfSettings,
         ]);
     }
 }
