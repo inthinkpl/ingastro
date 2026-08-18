@@ -1,12 +1,13 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Head } from '@inertiajs/vue3';
-import { Pizza, Flame, Utensils, Sparkles } from 'lucide-vue-next';
+import { Pizza } from 'lucide-vue-next';
 import { useCart } from '@/Composables/useCart';
 
 // Komponenty sklepowe z resources/js/Components/Shop/
 import Header from '@/Components/Shop/Header.vue';
 import HeroSection from '@/Components/Shop/HeroSection.vue';
+import CategoryFilter from '@/Components/Shop/CategoryFilter.vue';
 import HalfHalfBanner from '@/Components/Shop/HalfHalfBanner.vue';
 import HalfHalfModal from '@/Components/Shop/HalfHalfModal.vue';
 import ModifierModal from '@/Components/Shop/ModifierModal.vue';
@@ -32,18 +33,6 @@ const activeVariant = ref(null);
 const activeCategoryFilter = ref('Wszystko');
 
 const uniqueCategories = computed(() => ['Wszystko', ...new Set(props.products.map(p => p.category))]);
-
-const getCategoryIcon = (cat) => {
-    switch (cat?.toLowerCase()) {
-        case 'pizza': return Pizza;
-        case 'sałatki':
-        case 'salatki': return Utensils;
-        case 'makarony':
-        case 'pasta': return Flame;
-        case 'napoje': return Sparkles;
-        default: return Pizza;
-    }
-};
 
 const filteredProducts = computed(() => {
     if (activeCategoryFilter.value === 'Wszystko') return props.products;
@@ -122,21 +111,12 @@ const scrollToSection = (id) => {
                         <p class="text-slate-400 text-sm">Kliknij kafel kategorii, aby odfiltrować wybrane specjały.</p>
                     </div>
 
-                    <!-- KAFELKI KATEGORII -->
-                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-8">
-                        <button 
-                            v-for="cat in uniqueCategories" 
-                            :key="cat"
-                            @click="filterProducts(cat)"
-                            :class="activeCategoryFilter === cat ? 'bg-gradient-to-b from-red-600 to-red-700 text-white border-red-500 shadow-xl scale-[1.02]' : 'bg-slate-900/90 text-slate-300 border-slate-800 hover:border-slate-700'"
-                            class="p-4 rounded-2xl border transition-all flex flex-col items-center justify-center space-y-2 cursor-pointer text-center"
-                        >
-                            <div :class="activeCategoryFilter === cat ? 'bg-white/20 text-white' : 'bg-[#0B0F19] text-amber-500'" class="p-3 rounded-xl border border-slate-800">
-                                <component :is="getCategoryIcon(cat)" class="w-6 h-6" />
-                            </div>
-                            <span class="font-bold text-xs uppercase tracking-wider">{{ cat }}</span>
-                        </button>
-                    </div>
+                    <!-- KAFELKI KATEGORII (KOMPONENT) -->
+                    <CategoryFilter 
+                        :categories="uniqueCategories" 
+                        :active-category="activeCategoryFilter" 
+                        @select-category="filterProducts" 
+                    />
 
                     <!-- BANER PÓŁ NA PÓŁ -->
                     <HalfHalfBanner 

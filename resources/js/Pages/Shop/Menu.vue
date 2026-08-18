@@ -1,13 +1,16 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { useForm, Link } from '@inertiajs/vue3';
-import axios from 'axios';
-import { 
-    Pizza, ShoppingBag, Phone, MapPin, Car, Store, 
-    AlertTriangle, Send, X, Loader2, Utensils, Flame, Sparkles, 
-    Menu as MenuIcon, Truck, Plus, CheckCircle2
-} from 'lucide-vue-next';
+import { Head } from '@inertiajs/vue3';
+import { Pizza } from 'lucide-vue-next';
 import { useCart } from '@/Composables/useCart';
+
+// Komponenty sklepowe z resources/js/Components/Shop/
+import Header from '@/Components/Shop/Header.vue';
+import CategoryFilter from '@/Components/Shop/CategoryFilter.vue';
+import HalfHalfBanner from '@/Components/Shop/HalfHalfBanner.vue';
+import HalfHalfModal from '@/Components/Shop/HalfHalfModal.vue';
+import ModifierModal from '@/Components/Shop/ModifierModal.vue';
+import CartSidebar from '@/Components/Shop/CartSidebar.vue';
 
 const props = defineProps({
     products: { type: Array, default: () => [] },
@@ -27,147 +30,17 @@ const props = defineProps({
     }
 });
 
-// WSPÓLNY KOSZYK Z COMPOSABLE
-const { cart, addToCart, removeFromCart, clearCart, cartSubtotal, cartItemsCount } = useCart();
+// Composable Koszyka
+const { cart, addToCart, removeFromCart, clearCart, cartItemsCount } = useCart();
 
-// Dynamiczny pasek postępu darmowej dostawy
-const freeDeliveryRemaining = computed(() => {
-    if (!props.freeDeliverySettings?.enabled) return 0;
-    const target = props.freeDeliverySettings.minAmount;
-    return Math.max(0, target - cartSubtotal.value);
-});
-
-const freeDeliveryProgress = computed(() => {
-    if (!props.freeDeliverySettings?.enabled) return 0;
-    const target = props.freeDeliverySettings.minAmount;
-    if (target <= 0) return 100;
-    return Math.min(100, Math.round((cartSubtotal.value / target) * 100));
-});
-
-// Wyciąganie produktów do sekcji Upsell (Sosy, Napoje, Dodatki, Desery lub produkty niebędące pizzą)
-const upsellProducts = computed(() => {
-    if (!props.upsellSettings?.enabled) return [];
-    
-    const categoriesToSuggest = ['sos', 'nap', 'doda', 'deser', 'sałat', 'pasta', 'drink'];
-    
-    let matched = props.products.filter(p => {
-        const catName = p.category?.toLowerCase() || '';
-        return categoriesToSuggest.some(c => catName.includes(c)) && p.variants?.length > 0;
-    });
-
-    // Fallback: jeśli brak produktów z wymienionych kategorii, proponuj dowolne produkty niebędące pizzą
-    if (matched.length === 0) {
-        matched = props.products.filter(p => p.category?.toLowerCase() !== 'pizza' && p.variants?.length > 0);
-    }
-
-    return matched.slice(0, 6);
-});
-
-const addUpsellItem = (product) => {
-    const variant = product.variants[0];
-    if (!variant) return;
-
-    addToCart({
-        variantId: variant.id,
-        name: product.name,
-        size: variant.size_name,
-        price: parseFloat(variant.price),
-        quantity: 1,
-        modifiers: []
-    });
-};
-
-// --- LOGIKA PIZZY PÓŁ NA PÓŁ ---
+// Stan modali i filtrowania
 const isHalfHalfModalOpen = ref(false);
-const pizzaProducts = computed(() => props.products.filter(p => p.category?.toLowerCase() === 'pizza'));
-
-const availableSizes = computed(() => {
-    const sizeMap = new Map();
-    pizzaProducts.value.forEach(p => {
-        p.variants?.forEach(v => {
-            if (!sizeMap.has(v.size_name)) {
-                sizeMap.set(v.size_name, v.size_name);
-            }
-        });
-    });
-    return Array.from(sizeMap.keys());
-});
-
-const selectedHalfHalfSize = ref('');
-const selectedLeftPizza = ref(null);
-const selectedRightPizza = ref(null);
-
-const openHalfHalfModal = () => {
-    if (availableSizes.value.length > 0) {
-        selectedHalfHalfSize.value = availableSizes.value[0];
-    }
-    selectedLeftPizza.value = pizzaProducts.value[0] || null;
-    selectedRightPizza.value = pizzaProducts.value[1] || pizzaProducts.value[0] || null;
-    isHalfHalfModalOpen.value = true;
-};
-
-const calculatedHalfHalfPrice = computed(() => {
-    if (!selectedLeftPizza.value || !selectedRightPizza.value || !selectedHalfHalfSize.value) return 0;
-
-    const leftVariant = selectedLeftPizza.value.variants?.find(v => v.size_name === selectedHalfHalfSize.value);
-    const rightVariant = selectedRightPizza.value.variants?.find(v => v.size_name === selectedHalfHalfSize.value);
-
-    const priceLeft = leftVariant ? parseFloat(leftVariant.price) : 0;
-    const priceRight = rightVariant ? parseFloat(rightVariant.price) : 0;
-
-    return Math.max(priceLeft, priceRight);
-});
-
-const addHalfHalfToCart = () => {
-    if (!selectedLeftPizza.value || !selectedRightPizza.value || !selectedHalfHalfSize.value) return;
-
-    const leftVariant = selectedLeftPizza.value.variants?.find(v => v.size_name === selectedHalfHalfSize.value);
-    const rightVariant = selectedRightPizza.value.variants?.find(v => v.size_name === selectedHalfHalfSize.value);
-
-    if (!leftVariant || !rightVariant) {
-        alert('Jeden z wybranych smaków nie posiada tego rozmiaru. Wybierz inny rozmiar.');
-        return;
-    }
-
-    addToCart({
-        variantId: leftVariant.id,
-        name: `Pizza ½ na ½ (${selectedLeftPizza.value.name} + ${selectedRightPizza.value.name})`,
-        size: selectedHalfHalfSize.value,
-        price: calculatedHalfHalfPrice.value,
-        quantity: 1,
-        modifiers: []
-    });
-
-    isHalfHalfModalOpen.value = false;
-};
-
-// Stan modali i nawigacji mobilnej
 const isModifierModalOpen = ref(false);
-const isMobileMenuOpen = ref(false);
 const activeProduct = ref(null);
 const activeVariant = ref(null);
-const selectedModifiers = ref([]);
 const activeCategoryFilter = ref('Wszystko');
 
-// Kod rabatowy
-const discountCodeInput = ref('');
-const appliedDiscount = ref(null);
-const discountError = ref(null);
-const isValidatingCode = ref(false);
-
 const uniqueCategories = computed(() => ['Wszystko', ...new Set(props.products.map(p => p.category))]);
-
-const getCategoryIcon = (cat) => {
-    switch (cat?.toLowerCase()) {
-        case 'pizza': return Pizza;
-        case 'sałatki':
-        case 'salatki': return Utensils;
-        case 'makarony':
-        case 'pasta': return Flame;
-        case 'napoje': return Sparkles;
-        default: return Pizza;
-    }
-};
 
 const filteredProducts = computed(() => {
     if (activeCategoryFilter.value === 'Wszystko') return props.products;
@@ -183,7 +56,9 @@ const handleVariantSelect = (product, variant) => {
     const hasIngredients = variant.ingredients && variant.ingredients.length > 0;
 
     if (isPizza && hasIngredients) {
-        openModifierModal(product, variant);
+        activeProduct.value = product;
+        activeVariant.value = variant;
+        isModifierModalOpen.value = true;
     } else {
         addToCart({
             variantId: variant.id,
@@ -196,186 +71,19 @@ const handleVariantSelect = (product, variant) => {
     }
 };
 
-const openModifierModal = (product, variant) => {
-    activeProduct.value = product;
-    activeVariant.value = variant;
-    selectedModifiers.value = [];
-    isModifierModalOpen.value = true;
-};
-
-const toggleModifier = (ingredient, action) => {
-    const existingIdx = selectedModifiers.value.findIndex(m => m.ingredient_id === ingredient.id);
-    if (existingIdx > -1) {
-        if (selectedModifiers.value[existingIdx].action === action) {
-            selectedModifiers.value.splice(existingIdx, 1);
-            return;
-        }
-        selectedModifiers.value[existingIdx].action = action;
-    } else {
-        selectedModifiers.value.push({ ingredient_id: ingredient.id, name: ingredient.name, action: action });
-    }
-};
-
-const getModifierAction = (ingredientId) => {
-    const found = selectedModifiers.value.find(m => m.ingredient_id === ingredientId);
-    return found ? found.action : null;
-};
-
-const addCustomizedToCart = () => {
-    addToCart({
-        variantId: activeVariant.value.id,
-        name: activeProduct.value.name,
-        size: activeVariant.value.size_name,
-        price: parseFloat(activeVariant.value.price),
-        quantity: 1,
-        modifiers: [...selectedModifiers.value]
-    });
-    isModifierModalOpen.value = false;
-};
-
-// Formularz zamówienia
-const form = useForm({
-    type: 'dostawa',
-    payment_method: 'blik',
-    delivery_address: '',
-    discount_code: '',
-    items: []
-});
-
-const discountValue = computed(() => {
-    if (!appliedDiscount.value) return 0.00;
-    if (appliedDiscount.value.type === 'percent') {
-        return Math.round((cartSubtotal.value * (appliedDiscount.value.value / 100)) * 100) / 100;
-    }
-    return Math.min(appliedDiscount.value.value, cartSubtotal.value);
-});
-
-const cartTotal = computed(() => Math.max(0, cartSubtotal.value - discountValue.value));
-
-const minOrderWarning = computed(() => {
-    if (form.type !== 'dostawa') return null;
-    if (cartTotal.value < props.minOrderAmount) {
-        const missing = (props.minOrderAmount - cartTotal.value).toFixed(2);
-        return `Minimum w dostawie wynosi ${props.minOrderAmount.toFixed(2)} zł. Brakuje ${missing} zł.`;
-    }
-    return null;
-});
-
-const applyDiscountCode = async () => {
-    if (!discountCodeInput.value) return;
-    discountError.value = null;
-    isValidatingCode.value = true;
-
-    try {
-        const response = await axios.post(route('discount.validate'), {
-            code: discountCodeInput.value,
-            subtotal: cartSubtotal.value
-        });
-        appliedDiscount.value = response.data;
-        form.discount_code = response.data.code;
-    } catch (error) {
-        appliedDiscount.value = null;
-        form.discount_code = '';
-        discountError.value = error.response?.data?.message || 'Błąd kodu.';
-    } finally {
-        isValidatingCode.value = false;
-    }
-};
-
-const removeDiscountCode = () => {
-    appliedDiscount.value = null;
-    discountCodeInput.value = '';
-    form.discount_code = '';
-    discountError.value = null;
-};
-
-const checkout = () => {
-    if (cart.value.length === 0 || minOrderWarning.value) return;
-
-    form.items = cart.value.map(item => ({
-        product_variant_id: item.variantId,
-        quantity: item.quantity,
-        modifiers: item.modifiers.map(m => ({
-            ingredient_id: m.ingredient_id,
-            action: m.action
-        }))
-    }));
-
-    form.post(route('order.store'), {
-        onSuccess: () => {
-            clearCart();
-            form.reset('delivery_address', 'discount_code');
-            appliedDiscount.value = null;
-            discountCodeInput.value = '';
-            alert('Grazie! Twoje zamówienie zostało przekazane bezpośrednio na monitor kuchenny naszej pizzerii.');
-        }
-    });
-};
-
 const scrollToSection = (id) => {
-    isMobileMenuOpen.value = false;
     const el = document.getElementById(id);
-    if (el) {
-        el.scrollIntoView({ behavior: 'smooth' });
-    }
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
 };
 </script>
 
 <template>
+    <Head title="Zamów Online - Pizzeria Savona" />
+
     <div class="bg-[#0B0F19] text-slate-300 font-sans antialiased selection:bg-red-500 selection:text-white min-h-screen">
 
         <!-- HEADER -->
-        <header class="sticky top-0 z-50 bg-[#0B0F19]/90 backdrop-blur-md border-b border-slate-900 shadow-xl">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-                
-                <Link :href="route('shop.index')" class="flex items-center space-x-2 cursor-pointer">
-                    <span class="text-2xl font-bold text-red-500 tracking-wider">SAVONA</span>
-                    <span class="text-xs bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full font-semibold">pizza</span>
-                </Link>
-                
-                <nav class="hidden md:flex items-center space-x-8 font-medium text-sm">
-                    <Link :href="route('shop.index') + '#o-nas'" class="text-slate-300 hover:text-red-500 transition cursor-pointer">O nas</Link>
-                    
-                    <Link 
-                        :href="route('shop.menu')" 
-                        class="bg-red-600/10 border border-red-500/30 text-red-400 hover:bg-red-600 hover:text-white px-3.5 py-1.5 rounded-full transition flex items-center space-x-1.5 cursor-pointer font-bold uppercase tracking-wide text-xs"
-                    >
-                        <Utensils class="w-3.5 h-3.5" />
-                        <span>Karta Dań (Menu)</span>
-                    </Link>
-
-                    <Link :href="route('shop.index') + '#kontakt'" class="text-slate-300 hover:text-red-500 transition cursor-pointer">Kontakt</Link>
-                </nav>
-
-                <div class="flex items-center space-x-3">
-                    <a href="tel:+48785555455" class="border border-slate-700 hover:border-slate-500 hover:text-white text-slate-300 px-3 sm:px-5 py-2.5 rounded-full font-semibold transition inline-flex items-center space-x-2 shadow-sm text-sm sm:text-base">
-                        <Phone class="w-4 h-4 text-amber-500" />
-                        <span class="hidden sm:inline">785 555 455</span>
-                    </a>
-                    
-                    <button @click="scrollToSection('cart-section')" class="bg-red-600 hover:bg-red-700 text-white px-4 sm:px-5 py-2.5 rounded-full font-semibold transition inline-flex items-center space-x-2 shadow-lg shadow-red-600/30 text-sm sm:text-base cursor-pointer">
-                        <ShoppingBag class="w-4 h-4" />
-                        <span class="hidden xs:inline">Koszyk</span>
-                        <span class="bg-amber-500 text-slate-950 text-xs px-2 py-0.5 rounded-full font-bold ml-1">
-                            {{ cartItemsCount }}
-                        </span>
-                    </button>
-
-                    <button @click="isMobileMenuOpen = !isMobileMenuOpen" class="md:hidden p-2 text-slate-400 hover:text-white">
-                        <MenuIcon class="w-6 h-6" />
-                    </button>
-                </div>
-            </div>
-
-            <div v-if="isMobileMenuOpen" class="md:hidden bg-slate-900 border-b border-slate-800 px-4 py-4 space-y-3 text-sm">
-                <Link :href="route('shop.index') + '#o-nas'" class="block text-slate-300 py-1">O nas</Link>
-                <Link :href="route('shop.menu')" class="block text-amber-400 font-bold py-1 flex items-center space-x-2">
-                    <Utensils class="w-4 h-4" />
-                    <span>Karta Dań (Menu)</span>
-                </Link>
-                <Link :href="route('shop.index') + '#kontakt'" class="block text-slate-300 py-1">Kontakt</Link>
-            </div>
-        </header>
+        <Header :cart-count="cartItemsCount" @open-cart="scrollToSection('cart-section')" />
 
         <!-- SEKCJA GŁÓWNA -->
         <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -388,51 +96,38 @@ const scrollToSection = (id) => {
                     </div>
                 </div>
 
-                <!-- KAFELKI KATEGORII -->
-                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                    <button 
-                        v-for="cat in uniqueCategories" 
-                        :key="cat"
-                        @click="filterProducts(cat)"
-                        :class="activeCategoryFilter === cat ? 'bg-gradient-to-b from-red-600 to-red-700 text-white border-red-500 shadow-xl shadow-red-600/20 scale-[1.02]' : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:bg-slate-800/80'"
-                        class="p-3.5 rounded-2xl border transition-all duration-300 flex flex-col items-center justify-center space-y-2 cursor-pointer text-center"
-                    >
-                        <div :class="activeCategoryFilter === cat ? 'bg-white/20 text-white' : 'bg-[#0B0F19] text-amber-500'" class="p-2.5 rounded-xl border border-slate-800">
-                            <component :is="getCategoryIcon(cat)" class="w-5 h-5" />
-                        </div>
-                        <span class="font-bold text-xs uppercase tracking-wider">{{ cat }}</span>
-                    </button>
-                </div>
+                <!-- KAFELKI KATEGORII (WSPÓŁDZIELONY KOMPONENT) -->
+                <CategoryFilter 
+                    :categories="uniqueCategories" 
+                    :active-category="activeCategoryFilter" 
+                    @select-category="filterProducts" 
+                />
             </div>
 
-            <!-- BANER SKOMPONUJ PIZZĘ PÓŁ NA PÓŁ -->
-            <div v-if="halfHalfSettings?.enabled" class="bg-gradient-to-r from-amber-500/10 via-red-600/10 to-amber-500/10 border border-amber-500/30 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
-                <div class="flex items-center space-x-4">
-                    <div class="p-3 bg-amber-500/20 border border-amber-500/40 text-amber-400 rounded-2xl shrink-0">
-                        <Pizza class="w-8 h-8" />
-                    </div>
-                    <div>
-                        <h3 class="text-base sm:text-lg font-black text-white uppercase tracking-wide">Nie możesz się zdecydować? Stwórz Pizzę Pół na Pół! 🍕🍕</h3>
-                        <p class="text-xs text-slate-300 mt-0.5">Połącz dwa dowolne smaki na jednej pizzy. Cena zostanie automatycznie obliczona.</p>
-                    </div>
-                </div>
-                <button 
-                    @click="openHalfHalfModal"
-                    class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-6 py-3 rounded-xl text-xs uppercase tracking-wider transition cursor-pointer shrink-0 shadow-lg"
-                >
-                    Skomponuj Pół na Pół
-                </button>
-            </div>
+            <!-- BANER PIZZY PÓŁ NA PÓŁ -->
+            <HalfHalfBanner 
+                v-if="halfHalfSettings?.enabled" 
+                @open-modal="isHalfHalfModalOpen = true" 
+            />
 
             <!-- SIATKA DAŃ ORAZ KOSZYK BOCZNY -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                 
                 <!-- LISTA PRODUKTÓW -->
                 <div class="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div v-for="product in filteredProducts" :key="product.id" class="bg-slate-900 rounded-2xl overflow-hidden shadow-xl border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between">
+                    <div 
+                        v-for="product in filteredProducts" 
+                        :key="product.id" 
+                        class="bg-slate-900 rounded-2xl overflow-hidden shadow-xl border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between"
+                    >
                         <div>
                             <div class="h-48 overflow-hidden relative bg-slate-950">
-                                <img v-if="product.image_path" :src="'/storage/' + product.image_path" :alt="product.name" class="w-full h-full object-cover opacity-90" />
+                                <img 
+                                    v-if="product.image_path" 
+                                    :src="'/storage/' + product.image_path" 
+                                    :alt="product.name" 
+                                    class="w-full h-full object-cover opacity-90" 
+                                />
                                 <div v-else class="h-full w-full flex flex-col items-center justify-center text-slate-600 bg-slate-950">
                                     <Pizza class="w-10 h-10 text-slate-700" />
                                 </div>
@@ -464,273 +159,40 @@ const scrollToSection = (id) => {
                     </div>
                 </div>
 
-                <!-- BOCZNY KOSZYK -->
-                <div id="cart-section" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 sticky top-24 shadow-2xl space-y-4">
-                    <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider border-b border-slate-800 pb-3 flex items-center justify-between">
-                        <span>Podsumowanie Zamówienia</span>
-                        <ShoppingBag class="w-4 h-4 text-amber-500" />
-                    </h3>
-
-                    <!-- PASEK POSTĘPU DARMOWEJ DOSTAWY -->
-                    <div 
-                        v-if="freeDeliverySettings?.enabled && cart.length > 0" 
-                        class="bg-[#0B0F19] p-3 rounded-xl border border-slate-800 space-y-2"
-                    >
-                        <div class="flex justify-between items-center text-xs">
-                            <span class="font-bold text-slate-300 flex items-center space-x-1.5">
-                                <Truck class="w-4 h-4 text-amber-500" />
-                                <span v-if="freeDeliveryRemaining > 0">Darmowa dostawa</span>
-                                <span v-else class="text-emerald-400 font-extrabold">Masz DARMOWĄ dostawę! 🎉</span>
-                            </span>
-                            <span class="font-mono font-bold text-amber-400 text-[11px]">
-                                {{ freeDeliveryProgress }}%
-                            </span>
-                        </div>
-
-                        <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
-                            <div 
-                                class="h-full transition-all duration-500 ease-out rounded-full"
-                                :class="freeDeliveryRemaining === 0 ? 'bg-gradient-to-r from-emerald-500 to-teal-400' : 'bg-gradient-to-r from-amber-500 to-red-500'"
-                                :style="{ width: freeDeliveryProgress + '%' }"
-                            ></div>
-                        </div>
-
-                        <p v-if="freeDeliveryRemaining > 0" class="text-[11px] text-slate-400">
-                            Dołóż jeszcze <strong class="text-amber-400 font-mono">{{ freeDeliveryRemaining.toFixed(2) }} zł</strong>, aby nie płacić za dostawę!
-                        </p>
-                    </div>
-
-                    <!-- LISTA W KOSZYKU -->
-                    <div class="space-y-2.5 max-h-[35vh] overflow-y-auto pr-1">
-                        <div v-for="(item, idx) in cart" :key="idx" class="bg-[#0B0F19] p-3 rounded-xl border border-slate-800 text-xs space-y-1">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <div class="font-bold text-white uppercase">{{ item.name }}</div>
-                                    <div class="text-slate-400 text-[10px]">{{ item.size }} — {{ item.quantity }} szt.</div>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <span class="font-mono font-bold text-emerald-400">{{ (item.price * item.quantity).toFixed(2) }} zł</span>
-                                    <button @click="removeFromCart(idx)" class="text-slate-500 hover:text-red-400 transition cursor-pointer">
-                                        <X class="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div v-if="item.modifiers.length > 0" class="flex flex-wrap gap-1 mt-1 pt-1 border-t border-slate-800/60">
-                                <span 
-                                    v-for="mod in item.modifiers" 
-                                    :key="mod.ingredient_id"
-                                    :class="mod.action === 'ADD' ? 'bg-emerald-950/60 text-emerald-400 border-emerald-900' : 'bg-red-950/60 text-red-400 border-red-900'"
-                                    class="text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase"
-                                >
-                                    {{ mod.action === 'ADD' ? 'Extra' : 'Bez' }} {{ mod.name }}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div v-if="cart.length === 0" class="text-center py-8 text-xs text-slate-500 italic">
-                            Koszyk jest pusty. Wybierz danie z listy.
-                        </div>
-                    </div>
-
-                    <!-- SEKCJA UP-SELLING: CZĘSTO ZAMAWIANE RAZEM -->
-                    <div v-if="upsellSettings?.enabled && cart.length > 0 && upsellProducts.length > 0" class="pt-3 border-t border-slate-800 space-y-2">
-                        <div class="flex items-center justify-between">
-                            <span class="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center space-x-1">
-                                <Sparkles class="w-3.5 h-3.5" />
-                                <span>Często zamawiane razem</span>
-                            </span>
-                        </div>
-
-                        <div class="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
-                            <div 
-                                v-for="item in upsellProducts" 
-                                :key="item.id"
-                                class="bg-[#0B0F19] p-2 rounded-xl border border-slate-800 shrink-0 w-32 flex flex-col justify-between text-left space-y-1.5"
-                            >
-                                <div>
-                                    <span class="text-[11px] font-bold text-white block truncate">{{ item.name }}</span>
-                                    <span class="text-[10px] text-amber-400 font-mono font-bold block">{{ item.variants[0]?.price }} zł</span>
-                                </div>
-                                <button 
-                                    @click="addUpsellItem(item)"
-                                    class="w-full bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-200 py-1 rounded-lg text-[10px] font-bold uppercase transition flex items-center justify-center space-x-0.5 cursor-pointer"
-                                >
-                                    <Plus class="w-3 h-3" />
-                                    <span>Dodaj</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div v-if="cart.length > 0" class="space-y-3 pt-3 border-t border-slate-800">
-                        <div class="grid grid-cols-2 gap-2">
-                            <button 
-                                @click="form.type = 'dostawa'" 
-                                :class="form.type === 'dostawa' ? 'bg-red-600 text-white border-red-500' : 'bg-[#0B0F19] text-slate-400 border-slate-800'"
-                                class="py-2 rounded-xl text-xs font-bold border transition flex items-center justify-center space-x-1.5 cursor-pointer"
-                            >
-                                <Car class="w-3.5 h-3.5" />
-                                <span>Dostawa</span>
-                            </button>
-                            <button 
-                                @click="form.type = 'wynos'" 
-                                :class="form.type === 'wynos' ? 'bg-red-600 text-white border-red-500' : 'bg-[#0B0F19] text-slate-400 border-slate-800'"
-                                class="py-2 rounded-xl text-xs font-bold border transition flex items-center justify-center space-x-1.5 cursor-pointer"
-                            >
-                                <Store class="w-3.5 h-3.5" />
-                                <span>Odbiór</span>
-                            </button>
-                        </div>
-
-                        <div v-if="form.type === 'dostawa'" class="space-y-1">
-                            <input 
-                                v-model="form.delivery_address" 
-                                type="text" 
-                                placeholder="Adres dostawy (ulica, numer)" 
-                                class="w-full bg-[#0B0F19] border border-slate-800 focus:border-red-500 rounded-xl p-2.5 text-xs text-white"
-                                :required="form.type === 'dostawa'"
-                            />
-                        </div>
-
-                        <p v-if="minOrderWarning" class="text-[10px] text-red-400 bg-red-950/40 p-2 rounded-xl border border-red-900/50 font-bold flex items-center space-x-1">
-                            <AlertTriangle class="w-3.5 h-3.5 text-red-400 shrink-0" />
-                            <span>{{ minOrderWarning }}</span>
-                        </p>
-
-                        <div class="grid grid-cols-3 gap-1">
-                            <button @click="form.payment_method = 'blik'" :class="form.payment_method === 'blik' ? 'bg-amber-500/20 text-amber-400 border-amber-500' : 'bg-[#0B0F19] text-slate-400 border-slate-800'" class="py-1.5 rounded-xl text-[10px] font-bold border transition text-center cursor-pointer">BLIK</button>
-                            <button @click="form.payment_method = 'payu'" :class="form.payment_method === 'payu' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500' : 'bg-[#0B0F19] text-slate-400 border-slate-800'" class="py-1.5 rounded-xl text-[10px] font-bold border transition text-center cursor-pointer">PayU</button>
-                            <button @click="form.payment_method = 'gotówka'" :class="form.payment_method === 'gotówka' ? 'bg-blue-500/20 text-blue-400 border-blue-500' : 'bg-[#0B0F19] text-slate-400 border-slate-800'" class="py-1.5 rounded-xl text-[10px] font-bold border transition text-center cursor-pointer">Gotówka</button>
-                        </div>
-
-                        <div class="flex justify-between items-center pt-2 border-t border-slate-800">
-                            <span class="text-xs text-slate-300 uppercase font-bold">Razem:</span>
-                            <span class="text-2xl font-black font-mono text-emerald-400">{{ cartTotal.toFixed(2) }} zł</span>
-                        </div>
-
-                        <button 
-                            @click="checkout"
-                            :disabled="(form.type === 'dostawa' && (!form.delivery_address || minOrderWarning)) || form.processing"
-                            class="w-full bg-red-600 hover:bg-red-700 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold py-3 rounded-xl text-xs uppercase tracking-wider transition flex items-center justify-center space-x-2 cursor-pointer shadow-lg"
-                        >
-                            <Send class="w-4 h-4" />
-                            <span>{{ form.processing ? 'Wysyłanie...' : 'Złóż Zamówienie' }}</span>
-                        </button>
-                    </div>
+                <!-- BOCZNY KOSZYK (WSPÓŁDZIELONY KOMPONENT) -->
+                <div id="cart-section">
+                    <CartSidebar 
+                        :cart="cart"
+                        :products="products"
+                        :min-order-amount="minOrderAmount"
+                        :free-delivery-settings="freeDeliverySettings"
+                        :upsell-settings="upsellSettings"
+                        @remove-item="removeFromCart"
+                        @add-to-cart="addToCart"
+                        @clear-cart="clearCart"
+                    />
                 </div>
 
             </div>
 
         </main>
 
-        <!-- MODAL KONFIGURATORA PIZZY PÓŁ NA PÓŁ -->
-        <div v-if="isHalfHalfModalOpen" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm z-50">
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
-                <div class="border-b border-slate-800 pb-3 mb-4 flex justify-between items-start">
-                    <div>
-                        <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wide flex items-center space-x-1.5">
-                            <Pizza class="w-4 h-4" />
-                            <span>Konfigurator Pizzy Pół na Pół</span>
-                        </h3>
-                        <p class="text-xs text-slate-400 mt-0.5">Wybierz rozmiar oraz dwa smaki, które chcesz połączyć.</p>
-                    </div>
-                    <button @click="isHalfHalfModalOpen = false" class="text-slate-500 hover:text-white transition cursor-pointer">
-                        <X class="w-5 h-5" />
-                    </button>
-                </div>
+        <!-- MODALE -->
+        <HalfHalfModal 
+            v-if="halfHalfSettings?.enabled"
+            :is-open="isHalfHalfModalOpen" 
+            :products="products" 
+            @close="isHalfHalfModalOpen = false" 
+            @add-to-cart="addToCart" 
+        />
 
-                <div class="overflow-y-auto space-y-5 pr-1 flex-1">
-                    <div class="space-y-2">
-                        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wide">1. Wybierz Rozmiar:</label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button 
-                                v-for="size in availableSizes" 
-                                :key="size"
-                                @click="selectedHalfHalfSize = size"
-                                :class="selectedHalfHalfSize === size ? 'bg-amber-500 text-slate-950 font-black border-amber-500' : 'bg-[#0B0F19] text-slate-300 border-slate-800 hover:border-slate-700'"
-                                class="p-2.5 rounded-xl border text-xs uppercase font-bold transition cursor-pointer text-center"
-                            >
-                                {{ size }}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="space-y-2">
-                        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wide">2. Pierwsza Połówka (Lewa Strona):</label>
-                        <select 
-                            v-model="selectedLeftPizza"
-                            class="w-full bg-[#0B0F19] border border-slate-800 focus:border-amber-500 rounded-xl p-2.5 text-xs text-white uppercase font-bold"
-                        >
-                            <option v-for="p in pizzaProducts" :key="p.id" :value="p">
-                                {{ p.name }}
-                            </option>
-                        </select>
-                    </div>
-
-                    <div class="space-y-2">
-                        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wide">3. Druga Połówka (Prawa Strona):</label>
-                        <select 
-                            v-model="selectedRightPizza"
-                            class="w-full bg-[#0B0F19] border border-slate-800 focus:border-amber-500 rounded-xl p-2.5 text-xs text-white uppercase font-bold"
-                        >
-                            <option v-for="p in pizzaProducts" :key="p.id" :value="p">
-                                {{ p.name }}
-                            </option>
-                        </select>
-                    </div>
-
-                    <div class="bg-[#0B0F19] p-4 rounded-xl border border-slate-800 space-y-2">
-                        <span class="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">Podsumowanie Twojej Pizzy:</span>
-                        <div class="text-xs text-white font-bold flex justify-between items-center">
-                            <span>½ {{ selectedLeftPizza?.name || '---' }} + ½ {{ selectedRightPizza?.name || '---' }}</span>
-                        </div>
-                        <div class="text-xs text-slate-400 flex justify-between items-center pt-1 border-t border-slate-800">
-                            <span>Rozmiar: <strong class="text-slate-200">{{ selectedHalfHalfSize }}</strong></span>
-                            <span class="text-base font-black font-mono text-emerald-400">{{ calculatedHalfHalfPrice.toFixed(2) }} zł</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex space-x-3 pt-4 border-t border-slate-800 mt-4">
-                    <button @click="isHalfHalfModalOpen = false" class="w-1/3 bg-slate-800 hover:bg-slate-700 py-2.5 rounded-xl text-xs font-bold uppercase text-slate-300 transition cursor-pointer">Anuluj</button>
-                    <button @click="addHalfHalfToCart" class="w-2/3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-2.5 rounded-xl text-xs uppercase transition shadow-md cursor-pointer flex items-center justify-center space-x-1.5">
-                        <CheckCircle2 class="w-4 h-4" />
-                        <span>Dodaj Pół na Pół do koszyka</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL MODYFIKACJI SKŁADNIKÓW -->
-        <div v-if="isModifierModalOpen" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm z-50">
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col max-h-[85vh]">
-                <div class="border-b border-slate-800 pb-3 mb-4 flex justify-between items-start">
-                    <div>
-                        <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wide">Modyfikacja składników</h3>
-                        <p class="text-xs text-slate-400 font-medium">{{ activeProduct?.name }} ({{ activeVariant?.size_name }})</p>
-                    </div>
-                    <button @click="isModifierModalOpen = false" class="text-slate-500 hover:text-white transition cursor-pointer">
-                        <X class="w-5 h-5" />
-                    </button>
-                </div>
-
-                <div class="overflow-y-auto space-y-2 pr-1 flex-1">
-                    <div v-for="ing in activeVariant?.ingredients" :key="ing.id" class="bg-[#0B0F19] p-2.5 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
-                        <span class="font-bold text-slate-200 uppercase tracking-wide text-[11px]">{{ ing.name }}</span>
-                        <div class="flex space-x-2">
-                            <button @click="toggleModifier(ing, 'REMOVE')" :class="getModifierAction(ing.id) === 'REMOVE' ? 'bg-red-600 text-white border-red-500' : 'bg-slate-900 text-red-400 border-slate-800'" class="px-2.5 py-1 text-[10px] font-bold rounded-lg border uppercase cursor-pointer">Bez</button>
-                            <button @click="toggleModifier(ing, 'ADD')" :class="getModifierAction(ing.id) === 'ADD' ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-900 text-emerald-400 border-slate-800'" class="px-2.5 py-1 text-[10px] font-bold rounded-lg border uppercase cursor-pointer">+ Extra</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex space-x-3 pt-4 border-t border-slate-800 mt-4">
-                    <button @click="isModifierModalOpen = false" class="w-1/3 bg-slate-800 hover:bg-slate-700 py-2.5 rounded-xl text-xs font-bold uppercase text-slate-300 transition cursor-pointer">Anuluj</button>
-                    <button @click="addCustomizedToCart" class="w-2/3 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl text-xs uppercase transition shadow-md cursor-pointer">Dodaj do koszyka</button>
-                </div>
-            </div>
-        </div>
+        <ModifierModal 
+            :is-open="isModifierModalOpen" 
+            :product="activeProduct" 
+            :variant="activeVariant" 
+            @close="isModifierModalOpen = false" 
+            @add-to-cart="addToCart" 
+        />
 
     </div>
 </template>

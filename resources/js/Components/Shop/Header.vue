@@ -1,5 +1,6 @@
 <script setup>
-import { ref } from 'vue';
+import { computed } from 'vue';
+import { Link, usePage } from '@inertiajs/vue3';
 import { Phone, ShoppingBag } from 'lucide-vue-next';
 
 defineProps({
@@ -7,6 +8,12 @@ defineProps({
 });
 
 defineEmits(['open-cart']);
+
+const page = usePage();
+
+// Sprawdzamy aktualny URL, aby określić, która zakładka jest aktywna
+const isHomeActive = computed(() => page.url === '/' || page.url.startsWith('/#'));
+const isMenuActiv = computed(() => page.url.startsWith('/menu'));
 </script>
 
 <template>
@@ -14,16 +21,32 @@ defineEmits(['open-cart']);
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
             
             <!-- LOGO -->
-            <a href="/" class="flex items-center space-x-2">
+            <Link :href="route('shop.index')" class="flex items-center space-x-2 cursor-pointer">
                 <span class="text-2xl font-black text-red-500 tracking-wider">SAVONA</span>
                 <span class="text-[10px] bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">pizza</span>
-            </a>
+            </Link>
 
-            <!-- NAWIGACJA -->
-            <nav class="hidden md:flex space-x-8 text-sm font-semibold text-slate-300">
-                <a href="#promocje" class="hover:text-red-500 transition">Promocje</a>
-                <a href="#menu" class="hover:text-red-500 transition">Menu</a>
-                <a href="#lokale" class="hover:text-red-500 transition">Lokale & Kontakt</a>
+            <!-- NAWIGACJA Z DYNAMICZNYM PODŚWIETLENIEM -->
+            <nav class="hidden md:flex space-x-8 text-sm font-semibold">
+                <Link 
+                    :href="route('shop.index')" 
+                    :class="isHomeActive ? 'text-amber-400 font-bold' : 'text-slate-300 hover:text-white'"
+                    class="transition"
+                >
+                    Strona Główna
+                </Link>
+
+                <Link 
+                    :href="route('shop.menu')" 
+                    :class="isMenuActiv ? 'text-amber-400 font-bold' : 'text-slate-300 hover:text-white'"
+                    class="transition"
+                >
+                    Karta Dań
+                </Link>
+
+                <a href="/#kontakt" class="text-slate-300 hover:text-white transition">
+                    Kontakt
+                </a>
             </nav>
 
             <!-- AKCJE -->
