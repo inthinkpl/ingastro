@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
-use App\Models\Ingredient; // <-- DODANY IMPORT
+use App\Models\Ingredient;
 use App\Models\SystemSetting;
 use Inertia\Inertia;
 
@@ -18,9 +18,15 @@ class ShopController extends Controller
 
         $minOrderAmount = (float) SystemSetting::get('min_order_amount', 40.00);
 
+        $freeDeliverySettings = [
+            'enabled'   => filter_var(SystemSetting::get('free_delivery_enabled', '0'), FILTER_VALIDATE_BOOLEAN),
+            'minAmount' => (float) SystemSetting::get('free_delivery_min_amount', 60.00),
+        ];
+
         return Inertia::render('Shop/Index', [
-            'products'       => $products,
-            'minOrderAmount' => $minOrderAmount,
+            'products'             => $products,
+            'minOrderAmount'       => $minOrderAmount,
+            'freeDeliverySettings' => $freeDeliverySettings,
         ]);
     }
 
@@ -37,10 +43,10 @@ class ShopController extends Controller
             ->where('tracking_token', $token)
             ->firstOrFail();
 
-        $phone = \App\Models\SystemSetting::get('restaurant_phone', '+48 500 600 700');
+        $phone = SystemSetting::get('restaurant_phone', '+48 500 600 700');
 
         return Inertia::render('Shop/OrderStatus', [
-            'order' => $order,
+            'order'           => $order,
             'restaurantPhone' => $phone,
         ]);
     }
@@ -55,10 +61,16 @@ class ShopController extends Controller
         $ingredients = Ingredient::all();
         $minOrderAmount = (float) SystemSetting::get('min_order_amount', 40.00);
 
+        $freeDeliverySettings = [
+            'enabled'   => filter_var(SystemSetting::get('free_delivery_enabled', '0'), FILTER_VALIDATE_BOOLEAN),
+            'minAmount' => (float) SystemSetting::get('free_delivery_min_amount', 60.00),
+        ];
+
         return Inertia::render('Shop/Menu', [
-            'products'       => $products,
-            'ingredients'    => $ingredients,
-            'minOrderAmount' => $minOrderAmount,
+            'products'             => $products,
+            'ingredients'          => $ingredients,
+            'minOrderAmount'       => $minOrderAmount,
+            'freeDeliverySettings' => $freeDeliverySettings,
         ]);
     }
 }

@@ -16,6 +16,8 @@ const props = defineProps({
     restaurantPhone: { type: String, default: '' },
     restaurantAddress: { type: String, default: '' },
     minOrderAmount: { type: [Number, String], default: 40.00 },
+    freeDeliveryEnabled: { type: Boolean, default: false },
+    freeDeliveryMinAmount: { type: [Number, String], default: 60.00 },
     currentGateway: { type: String, default: 'simulation' },
     payuEnv: { type: String, default: 'sandbox' },
     payuPosId: { type: String, default: '' },
@@ -121,6 +123,14 @@ onMounted(() => {
                     :restaurant-phone="restaurantPhone"
                     :restaurant-address="restaurantAddress"
                     :min-order-amount="minOrderAmount"
+                    :free-delivery-enabled="freeDeliveryEnabled"
+                    :free-delivery-min-amount="freeDeliveryMinAmount"
+                    :current-gateway="currentGateway"
+                    :payu-env="payuEnv"
+                    :payu-pos-id="payuPosId"
+                    :payu-client-id="payuClientId"
+                    :payu-client-secret="payuClientSecret"
+                    :payu-second-key="payuSecondKey"
                 />
 
                 <DiscountCodesManager 

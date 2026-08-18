@@ -5,18 +5,36 @@ import axios from 'axios';
 import { 
     Pizza, ShoppingBag, Phone, MapPin, Car, Store, 
     AlertTriangle, Send, X, Loader2, Utensils, Flame, Sparkles, 
-    Menu as MenuIcon
+    Menu as MenuIcon, Truck
 } from 'lucide-vue-next';
 import { useCart } from '@/Composables/useCart';
 
 const props = defineProps({
     products: { type: Array, default: () => [] },
     ingredients: { type: Array, default: () => [] },
-    minOrderAmount: { type: Number, default: 40.00 }
+    minOrderAmount: { type: Number, default: 40.00 },
+    freeDeliverySettings: { 
+        type: Object, 
+        default: () => ({ enabled: false, minAmount: 60.00 }) 
+    }
 });
 
 // WSPÓLNY KOSZYK Z COMPOSABLE
 const { cart, addToCart, removeFromCart, clearCart, cartSubtotal, cartItemsCount } = useCart();
+
+// Dynamiczny pasek postępu darmowej dostawy
+const freeDeliveryRemaining = computed(() => {
+    if (!props.freeDeliverySettings?.enabled) return 0;
+    const target = props.freeDeliverySettings.minAmount;
+    return Math.max(0, target - cartSubtotal.value);
+});
+
+const freeDeliveryProgress = computed(() => {
+    if (!props.freeDeliverySettings?.enabled) return 0;
+    const target = props.freeDeliverySettings.minAmount;
+    if (target <= 0) return 100;
+    return Math.min(100, Math.round((cartSubtotal.value / target) * 100));
+});
 
 // Stan modali i nawigacji mobilnej
 const isModifierModalOpen = ref(false);
@@ -340,6 +358,36 @@ const scrollToSection = (id) => {
                         <span>Podsumowanie Zamówienia</span>
                         <ShoppingBag class="w-4 h-4 text-amber-500" />
                     </h3>
+
+                    <!-- PASEK POSTĘPU DARMOWEJ DOSTAWY -->
+                    <div 
+                        v-if="freeDeliverySettings?.enabled && cart.length > 0" 
+                        class="bg-[#0B0F19] p-3 rounded-xl border border-slate-800 space-y-2"
+                    >
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-bold text-slate-300 flex items-center space-x-1.5">
+                                <Truck class="w-4 h-4 text-amber-500" />
+                                <span v-if="freeDeliveryRemaining > 0">Darmowa dostawa</span>
+                                <span v-else class="text-emerald-400 font-extrabold">Masz DARMOWĄ dostawę! 🎉</span>
+                            </span>
+                            <span class="font-mono font-bold text-amber-400 text-[11px]">
+                                {{ freeDeliveryProgress }}%
+                            </span>
+                        </div>
+
+                        <!-- PASEK PROGRESU -->
+                        <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                            <div 
+                                class="h-full transition-all duration-500 ease-out rounded-full"
+                                :class="freeDeliveryRemaining === 0 ? 'bg-gradient-to-r from-emerald-500 to-teal-400' : 'bg-gradient-to-r from-amber-500 to-red-500'"
+                                :style="{ width: freeDeliveryProgress + '%' }"
+                            ></div>
+                        </div>
+
+                        <p v-if="freeDeliveryRemaining > 0" class="text-[11px] text-slate-400">
+                            Dołóż jeszcze <strong class="text-amber-400 font-mono">{{ freeDeliveryRemaining.toFixed(2) }} zł</strong>, aby nie płacić za dostawę!
+                        </p>
+                    </div>
 
                     <div class="space-y-2.5 max-h-[40vh] overflow-y-auto pr-1">
                         <div v-for="(item, idx) in cart" :key="idx" class="bg-[#0B0F19] p-3 rounded-xl border border-slate-800 text-xs space-y-1">
