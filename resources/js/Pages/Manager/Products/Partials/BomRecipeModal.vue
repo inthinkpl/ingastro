@@ -1,57 +1,108 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
-import { useForm } from '@inertiajs/vue3';
-import { Layers, X, Plus, Save, AlertTriangle, Trash2 } from 'lucide-vue-next';
+import { useForm, router } from '@inertiajs/vue3';
+import { X, Plus, Save, Utensils, Loader2, Trash2 } from 'lucide-vue-next';
 
 const props = defineProps({
-    isOpen: Boolean,
-    product: Object,
-    ingredients: Array
+    isOpen: { type: Boolean, default: false },
+    product: { type: Object, default: null },
+    ingredients: { type: Array, default: () => [] }
 });
 
 const emit = defineEmits(['close']);
 
 const selectedVariantId = ref(null);
+const isAddingVariant = ref(false);
 
+// Formularz dodawania nowego wariantu
+const variantForm = useForm({
+    size_name: '',
+    price: ''
+});
+
+// Formularz receptury BOM
 const recipeForm = useForm({
     ingredients: []
 });
 
-const activeProductVariants = computed(() => {
-    return props.product?.variants || [];
+// Aktywny wybrany wariant
+const selectedVariant = computed(() => {
+    if (!props.product?.variants?.length) return null;
+    return props.product.variants.find(v => v.id === selectedVariantId.value) || props.product.variants[0];
 });
 
-const changeActiveVariant = (variantId) => {
-    selectedVariantId.value = variantId;
-    const variant = activeProductVariants.value.find(v => v.id === variantId);
+// Reakcja na zmianę wybranego dania (reset stanu formularzy)
+watch(() => props.product, (newProduct) => {
+    variantForm.reset();
+    variantForm.clearErrors();
+    isAddingVariant.value = false;
 
+    if (newProduct?.variants?.length) {
+        if (!selectedVariantId.value || !newProduct.variants.some(v => v.id === selectedVariantId.value)) {
+            selectedVariantId.value = newProduct.variants[0].id;
+        }
+    } else {
+        selectedVariantId.value = null;
+    }
+}, { immediate: true, deep: true });
+
+// Wypełnianie listy składników po zmianie aktywnego wariantu
+watch(selectedVariant, (variant) => {
     if (variant && variant.ingredients) {
         recipeForm.ingredients = variant.ingredients.map(ing => ({
             id: ing.id,
-            amount_needed: ing.pivot?.amount_needed || 0.10
+            name: ing.name,
+            unit: ing.unit,
+            amount_needed: ing.pivot?.amount_needed || ''
         }));
     } else {
         recipeForm.ingredients = [];
     }
+}, { immediate: true });
+
+// Zamykanie modalu
+const handleClose = () => {
+    variantForm.reset();
+    variantForm.clearErrors();
+    isAddingVariant.value = false;
+    emit('close');
 };
 
-watch(() => props.isOpen, (newVal) => {
-    if (newVal && props.product) {
-        recipeForm.reset();
-        if (props.product.variants && props.product.variants.length > 0) {
-            changeActiveVariant(props.product.variants[0].id);
-        } else {
-            selectedVariantId.value = null;
-            recipeForm.ingredients = [];
-        }
-    }
-});
+// Szybkie dodawanie nowego wariantu
+const handleAddVariant = () => {
+    if (!props.product) return;
 
+    variantForm.post(route('manager.products.variants.store', props.product.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            variantForm.reset();
+            variantForm.clearErrors();
+            isAddingVariant.value = false;
+        }
+    });
+};
+
+// Usuwanie wariantu rozmiarowego
+const handleDeleteVariant = (variantId) => {
+    if (confirm('Czy na pewno chcesz usunąć ten wariant rozmiarowy?')) {
+        router.delete(route('manager.products.variants.destroy', variantId), {
+            preserveScroll: true,
+            onSuccess: () => {
+                if (selectedVariantId.value === variantId) {
+                    selectedVariantId.value = null;
+                }
+            }
+        });
+    }
+};
+
+// Dodawanie wiersza surowca
 const addIngredientRow = () => {
-    const defaultId = props.ingredients.length > 0 ? props.ingredients[0].id : '';
     recipeForm.ingredients.push({
-        id: defaultId,
-        amount_needed: 0.10
+        id: '',
+        name: '',
+        unit: '',
+        amount_needed: ''
     });
 };
 
@@ -59,136 +110,214 @@ const removeIngredientRow = (index) => {
     recipeForm.ingredients.splice(index, 1);
 };
 
-const submitRecipe = () => {
-    if (!selectedVariantId.value) return;
-
-    recipeForm.post(route('manager.products.save_recipe', selectedVariantId.value), {
-        preserveScroll: true,
-        onSuccess: () => {
-            alert('Receptura BOM została pomyślnie zsynchronizowana z magazynem!');
-            emit('close');
-        }
-    });
+const handleIngredientSelect = (index, id) => {
+    const found = props.ingredients.find(i => i.id === parseInt(id));
+    if (found) {
+        recipeForm.ingredients[index].id = found.id;
+        recipeForm.ingredients[index].name = found.name;
+        recipeForm.ingredients[index].unit = found.unit;
+    }
 };
 
-const getIngredientUnit = (id) => {
-    const ing = props.ingredients.find(i => i.id === id);
-    return ing ? ing.unit : 'kg';
+// Zapis receptury BOM
+const handleSaveRecipe = () => {
+    if (!selectedVariant.value) return;
+
+    const validIngredients = recipeForm.ingredients
+        .filter(ing => ing.id && parseFloat(ing.amount_needed) > 0)
+        .map(ing => ({
+            id: ing.id,
+            amount_needed: parseFloat(ing.amount_needed)
+        }));
+
+    recipeForm.transform(() => ({
+        ingredients: validIngredients
+    })).post(route('manager.products.save_recipe', selectedVariant.value.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            alert('Receptura BOM została pomyślnie zapisana!');
+        }
+    });
 };
 </script>
 
 <template>
-    <div v-if="isOpen && product" class="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col justify-between space-y-4">
-            <div>
-                <div class="border-b border-slate-800 pb-3 mb-4 flex justify-between items-center">
-                    <div>
-                        <h3 class="text-base font-bold text-amber-500 uppercase flex items-center space-x-2">
-                            <Layers class="w-4 h-4" />
-                            <span>Konfiguracja BOM: {{ product.name }}</span>
-                        </h3>
-                        <p class="text-xs text-slate-400">Gospodarka magazynowa i zużycie surowców przy wydaniu zamówienia.</p>
+    <div v-if="isOpen" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm z-50">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
+            
+            <!-- NAGŁÓWEK MODALU -->
+            <div class="border-b border-slate-800 pb-4 mb-4 flex justify-between items-start">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2.5 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-xl">
+                        <Utensils class="w-5 h-5" />
                     </div>
-                    <button @click="$emit('close')" class="text-slate-500 hover:text-white p-1 cursor-pointer">
-                        <X class="w-5 h-5" />
+                    <div>
+                        <h3 class="text-base font-bold text-white uppercase tracking-wide">Receptura BOM — {{ product?.name }}</h3>
+                        <p class="text-xs text-slate-400">Określ zużycie surowców z magazynu dla każdego wariantu dań.</p>
+                    </div>
+                </div>
+                <button type="button" @click="handleClose" class="text-slate-500 hover:text-white transition cursor-pointer">
+                    <X class="w-5 h-5" />
+                </button>
+            </div>
+
+            <!-- PASEK WYBORU WARIANTU + PRZYCISKI WARIANTÓW -->
+            <div class="space-y-3 mb-4">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Wybierz Wariant:</span>
+                    <button 
+                        type="button"
+                        @click="isAddingVariant = !isAddingVariant"
+                        class="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center space-x-1 cursor-pointer"
+                    >
+                        <Plus class="w-3.5 h-3.5" />
+                        <span>{{ isAddingVariant ? 'Zamknij formularz' : 'Dodaj nowy wariant/rozmiar' }}</span>
                     </button>
                 </div>
 
-                <!-- WYBÓR ROZMIARU / WARIANTU DANIA -->
-                <div class="mb-5" v-if="activeProductVariants.length > 0">
-                    <label class="block font-bold text-slate-400 uppercase text-[10px] tracking-wider mb-2">Wybierz wariant / rozmiar do edycji przepisu:</label>
-                    <div class="flex flex-wrap gap-2">
+                <!-- LISTA WARIANTÓW Z PRZYCISKIEM USUWANIA ("X") -->
+                <div class="flex flex-wrap gap-2">
+                    <div 
+                        v-for="variant in product?.variants" 
+                        :key="variant.id"
+                        class="flex items-center overflow-hidden rounded-xl border transition"
+                        :class="selectedVariant?.id === variant.id ? 'bg-amber-500 border-amber-500 text-slate-950 font-black' : 'bg-[#0B0F19] border-slate-800 text-slate-300'"
+                    >
                         <button 
-                            v-for="variant in activeProductVariants" 
-                            :key="variant.id"
                             type="button"
-                            @click="changeActiveVariant(variant.id)"
-                            :class="selectedVariantId === variant.id ? 'bg-emerald-600 text-white font-bold border-emerald-500 shadow-md' : 'bg-[#0B0F19] border-slate-800 text-slate-400 hover:text-white'"
-                            class="text-xs px-3.5 py-2 border rounded-xl transition cursor-pointer"
+                            @click="selectedVariantId = variant.id"
+                            class="px-3 py-1.5 text-xs uppercase transition cursor-pointer flex items-center space-x-1.5"
                         >
-                            {{ variant.size_name || variant.size || variant.name }} ({{ variant.price }} zł)
+                            <span>{{ variant.size_name }}</span>
+                            <span class="opacity-75 font-mono">({{ variant.price }} zł)</span>
+                        </button>
+
+                        <button 
+                            type="button"
+                            @click.stop="handleDeleteVariant(variant.id)"
+                            title="Usuń wariant"
+                            class="px-2 py-1.5 hover:bg-red-600 hover:text-white transition cursor-pointer border-l"
+                            :class="selectedVariant?.id === variant.id ? 'border-amber-600 text-slate-900' : 'border-slate-800 text-slate-500'"
+                        >
+                            <X class="w-3.5 h-3.5" />
                         </button>
                     </div>
-                </div>
 
-                <div v-else class="mb-5 bg-amber-950/40 border border-amber-900/60 text-amber-400 p-3 rounded-xl text-xs font-medium flex items-center space-x-2">
-                    <AlertTriangle class="w-4 h-4 shrink-0" />
-                    <span>Ta pozycja nie posiada jeszcze zdefiniowanych wariantów (rozmiarów) w bazie danych.</span>
-                </div>
-
-                <!-- LISTA SKŁADNIKÓW RECEPTURY -->
-                <div v-if="selectedVariantId" class="space-y-3 overflow-y-auto max-h-[42vh] pr-2">
-                    <div class="flex justify-between items-center text-[10px] uppercase font-bold text-slate-500 tracking-wider px-2">
-                        <span class="w-7/12">Surowiec z magazynu</span>
-                        <span class="w-4/12 text-center">Ilość zużywana przy wydaniu</span>
-                        <span class="w-1/12"></span>
+                    <div v-if="!product?.variants?.length" class="text-xs text-amber-400 italic">
+                        Brak wariantów. Dodaj pierwszy wariant poniżej.
                     </div>
+                </div>
 
-                    <div v-for="(row, index) in recipeForm.ingredients" :key="index" class="flex items-center space-x-3 bg-[#0B0F19] p-2.5 rounded-2xl border border-slate-800">
-                        <div class="w-7/12">
-                            <select v-model="row.id" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-white focus:border-red-500">
-                                <option v-for="ing in ingredients" :key="ing.id" :value="ing.id">
-                                    {{ ing.name }} (w magazynie)
-                                </option>
-                            </select>
-                        </div>
+                <!-- FORMULARZ DODAWANIA NOWEGO WARIANTU -->
+                <div v-if="isAddingVariant || !product?.variants?.length" class="bg-[#0B0F19] p-3 rounded-xl border border-slate-800 space-y-2">
+                    <span class="text-[11px] font-bold text-amber-400 uppercase tracking-wider block">+ Nowy wariant rozmiarowy</span>
+                    <form @submit.prevent="handleAddVariant" class="flex gap-2">
+                        <input 
+                            v-model="variantForm.size_name" 
+                            type="text" 
+                            placeholder="Rozmiar (np. Gigant 50cm)" 
+                            class="flex-1 bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-1.5 text-xs text-white"
+                            required 
+                        />
+                        <input 
+                            v-model.number="variantForm.price" 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="Cena (zł)" 
+                            class="w-28 bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-1.5 text-xs text-white font-mono"
+                            required 
+                        />
+                        <button 
+                            type="submit" 
+                            :disabled="variantForm.processing"
+                            class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-1.5 rounded-xl text-xs uppercase cursor-pointer shrink-0 flex items-center space-x-1"
+                        >
+                            <Loader2 v-if="variantForm.processing" class="w-3.5 h-3.5 animate-spin" />
+                            <span v-else>Zapisz wariant</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
 
-                        <div class="w-4/12 flex items-center space-x-2 bg-slate-900 border border-slate-800 rounded-xl px-2">
+            <!-- TABELA SKŁADNIKÓW BOM -->
+            <div v-if="selectedVariant" class="flex-1 overflow-y-auto space-y-3 pr-1">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Składniki Receptury BOM dla {{ selectedVariant.size_name }}</span>
+                    <button 
+                        type="button"
+                        @click="addIngredientRow"
+                        class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-2.5 py-1 rounded-lg border border-slate-700 font-bold flex items-center space-x-1 cursor-pointer"
+                    >
+                        <Plus class="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Dodaj Składnik</span>
+                    </button>
+                </div>
+
+                <div class="space-y-2">
+                    <div 
+                        v-for="(row, idx) in recipeForm.ingredients" 
+                        :key="idx"
+                        class="flex items-center gap-2 bg-[#0B0F19] p-2 rounded-xl border border-slate-800"
+                    >
+                        <select 
+                            :value="row.id"
+                            @change="e => handleIngredientSelect(idx, e.target.value)"
+                            class="flex-1 bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-lg px-2.5 py-1.5 text-xs text-white uppercase"
+                        >
+                            <option value="">-- Wybierz surowiec --</option>
+                            <option v-for="ing in ingredients" :key="ing.id" :value="ing.id">
+                                {{ ing.name }} ({{ ing.unit }})
+                            </option>
+                        </select>
+
+                        <div class="flex items-center space-x-1 w-32">
                             <input 
-                                v-model.number="row.amount_needed" 
+                                v-model="row.amount_needed"
                                 type="number" 
                                 step="0.001" 
-                                min="0.001"
-                                class="w-full bg-transparent border-none text-xs text-white focus:ring-0 p-2 text-center font-mono font-bold" 
-                                required
+                                placeholder="Ilość" 
+                                class="w-full bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono text-right"
                             />
-                            <span class="text-[10px] text-slate-500 font-bold uppercase pr-1 font-mono shrink-0">
-                                {{ getIngredientUnit(row.id) }}
-                            </span>
+                            <span class="text-[10px] text-slate-400 w-8 font-bold">{{ row.unit || 'jedn.' }}</span>
                         </div>
 
-                        <div class="w-1/12 text-center">
-                            <button 
-                                type="button" 
-                                @click="removeIngredientRow(index)" 
-                                class="text-slate-500 hover:text-red-400 p-1 transition cursor-pointer"
-                                title="Usuń surowiec z receptury"
-                            >
-                                <Trash2 class="w-4 h-4" />
-                            </button>
-                        </div>
+                        <button 
+                            type="button"
+                            @click="removeIngredientRow(idx)"
+                            class="p-1.5 text-slate-500 hover:text-red-400 cursor-pointer"
+                        >
+                            <Trash2 class="w-4 h-4" />
+                        </button>
                     </div>
 
-                    <div v-if="recipeForm.ingredients.length === 0" class="text-center py-8 text-xs text-slate-500 italic border border-dashed border-slate-800 rounded-2xl">
-                        Receptura pusta. Dodaj składniki takie jak mąka, sos pomidorowy, ser czy serwatka.
+                    <div v-if="!recipeForm.ingredients.length" class="text-center py-6 text-xs text-slate-500 italic">
+                        Brak surowców w recepturze BOM dla tego wariantu. Kliknij "+ Dodaj Składnik".
                     </div>
-
-                    <button 
-                        type="button" 
-                        @click="addIngredientRow" 
-                        class="w-full border border-dashed border-slate-800 hover:border-emerald-900 hover:bg-emerald-950/20 text-slate-400 hover:text-emerald-400 font-bold text-xs p-3 rounded-2xl transition flex items-center justify-center space-x-2 cursor-pointer"
-                    >
-                        <Plus class="w-4 h-4" />
-                        <span>Dodaj kolejny składnik do przepisu</span>
-                    </button>
                 </div>
             </div>
 
             <!-- STOPKA MODALU -->
-            <div class="flex space-x-3 pt-4 border-t border-slate-800">
-                <button type="button" @click="$emit('close')" class="w-1/3 bg-[#0B0F19] hover:bg-slate-800 border border-slate-800 text-slate-400 py-3 rounded-xl font-bold uppercase text-xs transition cursor-pointer">
+            <div class="flex justify-between items-center pt-4 border-t border-slate-800 mt-4">
+                <button 
+                    type="button"
+                    @click="handleClose" 
+                    class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-4 py-2 rounded-xl text-xs uppercase cursor-pointer"
+                >
                     Zamknij
                 </button>
+
                 <button 
-                    type="button" 
-                    @click="submitRecipe" 
-                    :disabled="recipeForm.processing || !selectedVariantId" 
-                    class="w-2/3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 font-bold text-white py-3 rounded-xl uppercase text-xs tracking-wider transition shadow-lg flex items-center justify-center space-x-2 cursor-pointer"
+                    v-if="selectedVariant"
+                    type="button"
+                    @click="handleSaveRecipe"
+                    :disabled="recipeForm.processing"
+                    class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-5 py-2 rounded-xl text-xs uppercase flex items-center space-x-1.5 cursor-pointer shadow-lg disabled:opacity-50"
                 >
                     <Save class="w-4 h-4" />
-                    <span>{{ recipeForm.processing ? 'Synchronizacja...' : 'Zapisz recepturę BOM' }}</span>
+                    <span>Zapisz Recepturę BOM</span>
                 </button>
             </div>
+
         </div>
     </div>
 </template>

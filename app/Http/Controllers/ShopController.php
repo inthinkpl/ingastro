@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\Ingredient; // <-- DODANY IMPORT
 use App\Models\SystemSetting;
 use Inertia\Inertia;
 
@@ -15,7 +16,6 @@ class ShopController extends Controller
             ->orderBy('category')
             ->get();
 
-        // Pobieramy minimalne zamówienie za pomocą Twojego modelu SystemSetting
         $minOrderAmount = (float) SystemSetting::get('min_order_amount', 40.00);
 
         return Inertia::render('Shop/Index', [
@@ -42,6 +42,23 @@ class ShopController extends Controller
         return Inertia::render('Shop/OrderStatus', [
             'order' => $order,
             'restaurantPhone' => $phone,
+        ]);
+    }
+
+    public function menu()
+    {
+        $products = Product::with(['variants.ingredients'])
+            ->where('is_active', true)
+            ->orderBy('category')
+            ->get();
+
+        $ingredients = Ingredient::all();
+        $minOrderAmount = (float) SystemSetting::get('min_order_amount', 40.00);
+
+        return Inertia::render('Shop/Menu', [
+            'products'       => $products,
+            'ingredients'    => $ingredients,
+            'minOrderAmount' => $minOrderAmount,
         ]);
     }
 }

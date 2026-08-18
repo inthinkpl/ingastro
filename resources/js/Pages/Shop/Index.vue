@@ -1,12 +1,13 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { useForm, Link } from '@inertiajs/vue3';
 import axios from 'axios';
 import { 
     Pizza, ShoppingBag, Flame, Sparkles, Phone, MapPin, Clock, 
     Car, Store, Smartphone, Zap, Banknote, Ticket, Info, AlertTriangle, 
-    Send, ShieldCheck, X, Check, Loader2, Gift, Percent, Utensils
+    Send, ShieldCheck, X, Check, Loader2, Gift, Percent, Utensils, Menu as MenuIcon
 } from 'lucide-vue-next';
+import { useCart } from '@/Composables/useCart';
 
 const props = defineProps({
     products: { type: Array, default: () => [] },
@@ -14,9 +15,12 @@ const props = defineProps({
     minOrderAmount: { type: Number, default: 40.00 }
 });
 
-// Stan koszyka i modali
-const cart = ref([]);
+// WSPÓLNY KOSZYK Z COMPOSABLE
+const { cart, addToCart, removeFromCart, clearCart, cartSubtotal, cartItemsCount } = useCart();
+
+// Stan modali i nawigacji mobilnej
 const isModifierModalOpen = ref(false);
+const isMobileMenuOpen = ref(false);
 const activeProduct = ref(null);
 const activeVariant = ref(null);
 const selectedModifiers = ref([]);
@@ -31,6 +35,19 @@ const isValidatingCode = ref(false);
 // Dynamiczne kategorie
 const uniqueCategories = computed(() => ['Wszystko', ...new Set(props.products.map(p => p.category))]);
 
+// Przypisanie dedykowanych ikon do kategorii
+const getCategoryIcon = (cat) => {
+    switch (cat?.toLowerCase()) {
+        case 'pizza': return Pizza;
+        case 'sałatki':
+        case 'salatki': return Utensils;
+        case 'makarony':
+        case 'pasta': return Flame;
+        case 'napoje': return Sparkles;
+        default: return Pizza;
+    }
+};
+
 // Filtrowanie produktów
 const filteredProducts = computed(() => {
     if (activeCategoryFilter.value === 'Wszystko') {
@@ -41,6 +58,28 @@ const filteredProducts = computed(() => {
 
 const filterProducts = (cat) => {
     activeCategoryFilter.value = cat;
+    scrollToSection('products-grid');
+};
+
+// Modyfikacja składników dozwolona TYLKO dla kategorii Pizza
+const handleVariantSelect = (product, variant) => {
+    const isPizza = product.category?.toLowerCase() === 'pizza';
+    const hasIngredients = variant.ingredients && variant.ingredients.length > 0;
+
+    if (isPizza && hasIngredients) {
+        // Otwórz modal modyfikacji tylko dla pizzy
+        openModifierModal(product, variant);
+    } else {
+        // Wszystkie inne kategorie (napoje, sałatki, makarony, sosy itp.) -> od razu do koszyka
+        addToCart({
+            variantId: variant.id,
+            name: product.name,
+            size: variant.size_name,
+            price: parseFloat(variant.price),
+            quantity: 1,
+            modifiers: []
+        });
+    }
 };
 
 // Modyfikatory składników
@@ -70,7 +109,7 @@ const getModifierAction = (ingredientId) => {
 };
 
 const addCustomizedToCart = () => {
-    cart.value.push({
+    addToCart({
         variantId: activeVariant.value.id,
         name: activeProduct.value.name,
         size: activeVariant.value.size_name,
@@ -81,10 +120,6 @@ const addCustomizedToCart = () => {
     isModifierModalOpen.value = false;
 };
 
-const removeFromCart = (index) => {
-    cart.value.splice(index, 1);
-};
-
 // Formularz zamówienia Inertia
 const form = useForm({
     type: 'dostawa',
@@ -92,10 +127,6 @@ const form = useForm({
     delivery_address: '',
     discount_code: '',
     items: []
-});
-
-const cartSubtotal = computed(() => {
-    return cart.value.reduce((sum, i) => sum + (i.price * i.quantity), 0);
 });
 
 const discountValue = computed(() => {
@@ -109,8 +140,6 @@ const discountValue = computed(() => {
 const cartTotal = computed(() => {
     return Math.max(0, cartSubtotal.value - discountValue.value);
 });
-
-const cartItemsCount = computed(() => cart.value.reduce((sum, item) => sum + item.quantity, 0));
 
 const minOrderWarning = computed(() => {
     if (form.type !== 'dostawa') return null;
@@ -163,7 +192,7 @@ const checkout = () => {
 
     form.post(route('order.store'), {
         onSuccess: () => {
-            cart.value = [];
+            clearCart();
             form.reset('delivery_address', 'discount_code');
             appliedDiscount.value = null;
             discountCodeInput.value = '';
@@ -173,6 +202,7 @@ const checkout = () => {
 };
 
 const scrollToSection = (id) => {
+    isMobileMenuOpen.value = false;
     const el = document.getElementById(id);
     if (el) {
         el.scrollIntoView({ behavior: 'smooth' });
@@ -183,7 +213,7 @@ const scrollToSection = (id) => {
 <template>
     <div class="bg-[#0B0F19] text-slate-300 font-sans antialiased selection:bg-red-500 selection:text-white min-h-screen">
 
-        <!-- NAWIGACJA (DOKŁADNIE JAK W SAVONAPIZZA.PL) -->
+        <!-- NAWIGACJA GŁÓWNA -->
         <header class="sticky top-0 z-50 bg-[#0B0F19]/90 backdrop-blur-md border-b border-slate-900 shadow-xl">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
                 <a @click.prevent="scrollToSection('hero-section')" href="#" class="flex items-center space-x-2 cursor-pointer">
@@ -191,9 +221,18 @@ const scrollToSection = (id) => {
                     <span class="text-xs bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full font-semibold">pizza</span>
                 </a>
                 
-                <nav class="hidden md:flex space-x-8 font-medium">
+                <!-- MENU DESKTOP -->
+                <nav class="hidden md:flex items-center space-x-8 font-medium text-sm">
                     <a @click.prevent="scrollToSection('o-nas')" href="#o-nas" class="text-slate-300 hover:text-red-500 transition cursor-pointer">O nas</a>
-                    <a @click.prevent="scrollToSection('menu')" href="#menu" class="text-slate-300 hover:text-red-500 transition cursor-pointer">Menu</a>
+                    
+                    <Link 
+                        :href="route('shop.menu')" 
+                        class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full font-bold transition inline-flex items-center space-x-2 text-xs uppercase shadow-md"
+                    >
+                        <Utensils class="w-4 h-4" />
+                        <span>Przejdź do Menu & Zamów</span>
+                    </Link>
+
                     <a @click.prevent="scrollToSection('kontakt')" href="#kontakt" class="text-slate-300 hover:text-red-500 transition cursor-pointer">Kontakt</a>
                 </nav>
 
@@ -205,17 +244,37 @@ const scrollToSection = (id) => {
                     
                     <button @click="scrollToSection('menu')" class="bg-red-600 hover:bg-red-700 text-white px-4 sm:px-5 py-2.5 rounded-full font-semibold transition inline-flex items-center space-x-2 shadow-lg shadow-red-600/30 text-sm sm:text-base cursor-pointer">
                         <ShoppingBag class="w-4 h-4" />
-                        <span>Koszyk</span>
+                        <span class="hidden xs:inline">Koszyk</span>
                         <span class="bg-amber-500 text-slate-950 text-xs px-2 py-0.5 rounded-full font-bold ml-1">
                             {{ cartItemsCount }}
                         </span>
                     </button>
+
+                    <!-- PRZYCISK MOBILE MENU -->
+                    <button @click="isMobileMenuOpen = !isMobileMenuOpen" class="md:hidden p-2 text-slate-400 hover:text-white">
+                        <MenuIcon class="w-6 h-6" />
+                    </button>
                 </div>
+            </div>
+
+            <!-- ROZWIJANE MENU MOBILNE -->
+            <div v-if="isMobileMenuOpen" class="md:hidden bg-slate-900 border-b border-slate-800 px-4 py-4 space-y-3 text-sm">
+                <a @click.prevent="scrollToSection('o-nas')" href="#o-nas" class="block text-slate-300 py-1">O nas</a>
+                
+                <Link 
+                    :href="route('shop.menu')" 
+                    class="block bg-red-600 text-white font-bold py-2.5 px-4 rounded-xl text-center text-xs uppercase tracking-wider flex items-center justify-center space-x-2"
+                >
+                    <Utensils class="w-4 h-4" />
+                    <span>Przejdź do Menu & Zamów</span>
+                </Link>
+
+                <a @click.prevent="scrollToSection('kontakt')" href="#kontakt" class="block text-slate-300 py-1">Kontakt</a>
             </div>
         </header>
 
         <main>
-            <!-- BANER GŁÓWNY (HERO DOKŁADNIE JAK W SAVONAPIZZA.PL) -->
+            <!-- BANER GŁÓWNY (HERO) -->
             <section id="hero-section" class="relative bg-slate-950 text-white overflow-hidden py-24 lg:py-36">
                 <div class="absolute inset-0 opacity-20">
                     <img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=1920&auto=format&fit=crop" alt="Pyszna, świeża pizza w pizzerii Savona" class="w-full h-full object-cover">
@@ -225,7 +284,6 @@ const scrollToSection = (id) => {
                 <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10">
                     <div class="grid lg:grid-cols-12 gap-12 items-center">
                         
-                        <!-- LEWA STRONA: Teksty i przyciski akcji -->
                         <div class="lg:col-span-7 text-center lg:text-left space-y-6">
                             <span class="text-amber-400 font-semibold tracking-widest uppercase text-sm block">Tradycja smaku od lat w Białymstoku</span>
                             <h1 class="text-4xl md:text-6xl font-bold leading-tight text-white">
@@ -235,16 +293,16 @@ const scrollToSection = (id) => {
                                 Odkryj menu pełne chrupiącej pizzy, legendarnych sałatek i kultowych makaronów. Wypiekane z pasją, serwowane z miłością w samym centrum Białegostoku.
                             </p>
                             <div class="pt-4 flex flex-col sm:flex-row justify-center lg:justify-start gap-4">
-                                <button @click="scrollToSection('menu')" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-8 py-4 rounded-xl transition text-center shadow-lg shadow-amber-500/20 cursor-pointer">
+                                <Link :href="route('shop.menu')" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-8 py-4 rounded-xl transition text-center shadow-lg shadow-amber-500/20 cursor-pointer">
                                     Zobacz wybrane menu
-                                </button>
+                                </Link>
                                 <button @click="scrollToSection('menu')" class="border-2 border-slate-700 hover:border-slate-500 text-white font-semibold px-8 py-4 rounded-xl transition text-center backdrop-blur-sm bg-slate-900/40 cursor-pointer">
                                     Zamów przez Internet
                                 </button>
                             </div>
                         </div>
                         
-                        <!-- PRAWA STRONA: Sekcja aktualnych promocji -->
+                        <!-- PROMOCJE -->
                         <div class="lg:col-span-5 space-y-4 max-w-md mx-auto lg:mx-0 w-full">
                             <div class="text-center lg:text-left mb-1">
                                 <span class="inline-flex items-center space-x-1.5 bg-red-600/90 text-white text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider shadow-md shadow-red-600/10">
@@ -253,7 +311,6 @@ const scrollToSection = (id) => {
                                 </span>
                             </div>
                             
-                            <!-- Promocja 1 -->
                             <div class="bg-slate-900/70 border-2 border-white/20 backdrop-blur-md p-5 rounded-2xl shadow-xl flex items-start space-x-4 hover:border-white/40 transition duration-300">
                                 <div class="bg-red-500/10 p-3 rounded-xl border border-red-500/20 text-red-500 flex-shrink-0">
                                     <Gift class="w-6 h-6" />
@@ -266,7 +323,6 @@ const scrollToSection = (id) => {
                                 </div>
                             </div>
                             
-                            <!-- Promocja 2 -->
                             <div class="bg-slate-900/70 border-2 border-white/20 backdrop-blur-md p-5 rounded-2xl shadow-xl flex items-start space-x-4 hover:border-white/40 transition duration-300">
                                 <div class="bg-amber-500/10 p-3 rounded-xl border border-amber-500/20 text-amber-500 flex-shrink-0">
                                     <Percent class="w-6 h-6" />
@@ -284,7 +340,7 @@ const scrollToSection = (id) => {
                 </div>
             </section>
 
-            <!-- KAFELKI Z ADRESAMI LOKALI POD HERO BANEREM -->
+            <!-- ADRESY LOKALI -->
             <section class="relative z-20 -mt-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="grid md:grid-cols-2 gap-4">
                     <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-2xl backdrop-blur-md flex items-center space-x-4 hover:border-red-500/40 transition duration-300">
@@ -308,7 +364,7 @@ const scrollToSection = (id) => {
                 </div>
             </section>
 
-            <!-- O NAS / LOKALNE SEO -->
+            <!-- O NAS -->
             <section id="o-nas" class="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 scroll-mt-20">
                 <div class="grid md:grid-cols-2 gap-12 items-center">
                     <div class="space-y-4">
@@ -342,33 +398,39 @@ const scrollToSection = (id) => {
                 </div>
             </section>
 
-            <!-- KARTA DAŃ I INTERAKTYWNY SKLEP (INTERFEJS SKLEPU) -->
+            <!-- KARTA DAŃ I KAFELKI MENU -->
             <section id="menu" class="py-16 bg-slate-950/40 border-t border-b border-slate-900 scroll-mt-20">
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     
-                    <div class="text-center max-w-3xl mx-auto mb-12 space-y-3">
-                        <span class="text-red-500 font-semibold uppercase tracking-wider text-sm">Nasze Specjały</span>
-                        <h2 class="text-3xl md:text-4xl font-bold text-white">Wybrane pozycje z menu Savony</h2>
-                        <p class="text-slate-400">
-                            Wybierz wariant rozmiaru, dostosuj dodatki i złóż zamówienie bezpośrednio online.
+                    <div class="text-center max-w-3xl mx-auto mb-10 space-y-3">
+                        <span class="text-red-500 font-bold uppercase tracking-wider text-xs">Odkryj Nasze Smaki</span>
+                        <h2 class="text-3xl md:text-4xl font-bold text-white">Karta Dań & Menu Pizzerii</h2>
+                        <p class="text-slate-400 text-sm">
+                            Kliknij kafel kategorii, aby odfiltrować wybrane specjały i dostosować składniki do swojego zamówienia.
                         </p>
+                    </div>
 
-                        <!-- Filtry kategorii -->
-                        <div class="flex flex-wrap justify-center gap-2 pt-4">
-                            <button 
-                                v-for="cat in uniqueCategories" 
-                                :key="cat"
-                                @click="filterProducts(cat)"
-                                :class="activeCategoryFilter === cat ? 'bg-red-600 text-white font-bold border-red-500' : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'"
-                                class="px-4 py-2 rounded-xl text-xs uppercase font-bold tracking-wider border transition-all cursor-pointer"
+                    <!-- KAFELKI KATEGORII DAŃ -->
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-12">
+                        <button 
+                            v-for="cat in uniqueCategories" 
+                            :key="cat"
+                            @click="filterProducts(cat)"
+                            :class="activeCategoryFilter === cat ? 'bg-gradient-to-b from-red-600 to-red-700 text-white border-red-500 shadow-xl shadow-red-600/20 scale-[1.02]' : 'bg-slate-900/90 text-slate-300 border-slate-800 hover:border-slate-700 hover:bg-slate-800/80'"
+                            class="p-4 rounded-2xl border transition-all duration-300 flex flex-col items-center justify-center space-y-2 cursor-pointer group text-center"
+                        >
+                            <div 
+                                :class="activeCategoryFilter === cat ? 'bg-white/20 text-white' : 'bg-[#0B0F19] text-amber-500 group-hover:text-red-400'"
+                                class="p-3 rounded-xl border border-slate-800 transition"
                             >
-                                {{ cat }}
-                            </button>
-                        </div>
+                                <component :is="getCategoryIcon(cat)" class="w-6 h-6" />
+                            </div>
+                            <span class="font-bold text-xs uppercase tracking-wider">{{ cat }}</span>
+                        </button>
                     </div>
 
                     <!-- KARTY PRODUKTÓW ORAZ KOSZYK -->
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                    <div id="products-grid" class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start scroll-mt-24">
                         
                         <!-- LISTA DAŃ -->
                         <div class="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -406,7 +468,7 @@ const scrollToSection = (id) => {
                                     <button 
                                         v-for="variant in product.variants" 
                                         :key="variant.id"
-                                        @click="openModifierModal(product, variant)"
+                                        @click="handleVariantSelect(product, variant)"
                                         class="w-full bg-slate-950 hover:bg-red-600 border border-slate-800 hover:border-red-500 text-xs py-2.5 px-3 rounded-xl transition flex justify-between items-center group/btn cursor-pointer"
                                     >
                                         <span class="text-slate-300 group-hover/btn:text-white font-medium">{{ variant.size_name }}</span>
@@ -567,7 +629,7 @@ const scrollToSection = (id) => {
                 </div>
             </section>
 
-            <!-- KONTAKT (DOKŁADNIE JAK W SAVONAPIZZA.PL) -->
+            <!-- KONTAKT -->
             <section id="kontakt" class="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 scroll-mt-20">
                 <div class="bg-slate-900 rounded-3xl overflow-hidden text-white shadow-2xl border border-slate-800 grid md:grid-cols-2">
                     <div class="p-8 md:p-12 space-y-8 flex flex-col justify-center">
@@ -635,7 +697,7 @@ const scrollToSection = (id) => {
                 </div>
 
                 <div class="overflow-y-auto space-y-2 pr-1 flex-1">
-                    <div v-for="ing in activeVariant.ingredients" :key="ing.id" class="bg-[#0B0F19] p-3 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
+                    <div v-for="ing in activeVariant?.ingredients" :key="ing.id" class="bg-[#0B0F19] p-3 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
                         <span class="font-bold text-slate-200 uppercase tracking-wide text-[11px]">{{ ing.name }}</span>
                         <div class="flex space-x-2">
                             <button 

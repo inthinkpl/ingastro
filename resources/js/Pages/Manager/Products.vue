@@ -1,8 +1,8 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { router, Head } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Pizza, Plus } from 'lucide-vue-next';
+import { Pizza, Plus, Filter } from 'lucide-vue-next';
 
 // Komponenty cząstkowe
 import ProductTable from './Products/Partials/ProductTable.vue';
@@ -15,7 +15,24 @@ const props = defineProps({
     ingredients: { type: Array, default: () => [] }
 });
 
-const categories = ['Pizza', 'Sosy', 'Napoje', 'Sałatki', 'Desery'];
+// STAN FILTROWANIA KATEGORII
+const selectedCategory = ref('Wszystko');
+
+// Domyślne kategorie + automatyczne wykrywanie nowych z produktów
+const defaultCategories = ['Pizza', 'Sałatki', 'Makarony', 'Napoje', 'Desery', 'Sosy'];
+
+const categories = computed(() => {
+    const fromProducts = props.products ? props.products.map(p => p.category).filter(Boolean) : [];
+    return [...new Set([...defaultCategories, ...fromProducts])];
+});
+
+// PRZEFILTROWANA LISTA DAŃ PRZEKAZYWANA DO TABELI
+const filteredProducts = computed(() => {
+    if (selectedCategory.value === 'Wszystko') {
+        return props.products;
+    }
+    return props.products.filter(p => p.category === selectedCategory.value);
+});
 
 // Stany okien modalnych
 const isAddModalOpen = ref(false);
@@ -23,6 +40,12 @@ const isEditModalOpen = ref(false);
 const isRecipeModalOpen = ref(false);
 
 const selectedProduct = ref(null);
+
+// Reaktywne powiązanie: aktualizuje warianty w otwartym modalu po przeładowaniu danych przez Inertia
+const activeSelectedProduct = computed(() => {
+    if (!selectedProduct.value) return null;
+    return props.products.find(p => p.id === selectedProduct.value.id) || selectedProduct.value;
+});
 
 const handleOpenEditModal = (product) => {
     selectedProduct.value = product;
@@ -75,9 +98,41 @@ const handleDeleteProduct = (id) => {
                 {{ $page.props.flash.success }}
             </div>
 
+            <!-- PASEK FILTROWANIA KATEGORII -->
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-wrap items-center gap-2 shadow-xl">
+                <div class="flex items-center space-x-2 text-slate-400 font-bold text-xs uppercase tracking-wider mr-2 shrink-0">
+                    <Filter class="w-4 h-4 text-amber-500" />
+                    <span>Kategoria:</span>
+                </div>
+
+                <!-- Przycisk "Wszystko" -->
+                <button 
+                    @click="selectedCategory = 'Wszystko'"
+                    :class="selectedCategory === 'Wszystko' ? 'bg-amber-500 text-slate-950 font-black border-amber-500' : 'bg-[#0B0F19] text-slate-400 border-slate-800 hover:text-white'"
+                    class="px-3.5 py-1.5 rounded-xl text-xs uppercase font-bold tracking-wider border transition cursor-pointer flex items-center space-x-1.5"
+                >
+                    <span>Wszystko</span>
+                    <span class="bg-black/20 px-1.5 py-0.5 rounded-full text-[10px]">{{ products.length }}</span>
+                </button>
+
+                <!-- Przyciski poszczególnych kategorii -->
+                <button 
+                    v-for="cat in categories" 
+                    :key="cat"
+                    @click="selectedCategory = cat"
+                    :class="selectedCategory === cat ? 'bg-amber-500 text-slate-950 font-black border-amber-500' : 'bg-[#0B0F19] text-slate-400 border-slate-800 hover:text-white'"
+                    class="px-3.5 py-1.5 rounded-xl text-xs uppercase font-bold tracking-wider border transition cursor-pointer flex items-center space-x-1.5"
+                >
+                    <span>{{ cat }}</span>
+                    <span class="bg-black/20 px-1.5 py-0.5 rounded-full text-[10px]">
+                        {{ products.filter(p => p.category === cat).length }}
+                    </span>
+                </button>
+            </div>
+
             <!-- TABELA PRODUKTÓW -->
             <ProductTable 
-                :products="products"
+                :products="filteredProducts"
                 @open-recipe="handleOpenRecipeModal"
                 @open-edit="handleOpenEditModal"
                 @delete="handleDeleteProduct"
@@ -93,7 +148,7 @@ const handleDeleteProduct = (id) => {
             <!-- MODAL: EDYCJA PRODUKTU -->
             <EditProductModal 
                 :is-open="isEditModalOpen"
-                :product="selectedProduct"
+                :product="activeSelectedProduct"
                 :categories="categories"
                 @close="isEditModalOpen = false"
             />
@@ -101,7 +156,7 @@ const handleDeleteProduct = (id) => {
             <!-- MODAL: KONFIGURATOR RECEPTUR BOM -->
             <BomRecipeModal 
                 :is-open="isRecipeModalOpen"
-                :product="selectedProduct"
+                :product="activeSelectedProduct"
                 :ingredients="ingredients"
                 @close="isRecipeModalOpen = false"
             />

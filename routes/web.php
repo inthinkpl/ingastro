@@ -21,8 +21,8 @@ use App\Http\Controllers\Manager\DeliveryZoneController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\DriverDeliveryController;
 use App\Http\Controllers\PushSubscriptionController;
-use App\Http\Controllers\RcpController; // 🔥 Import kontrolera RCP
-
+use App\Http\Controllers\RcpController; 
+use App\Http\Controllers\BomController;
 
 /*
 |--------------------------------------------------------------------------
@@ -31,6 +31,7 @@ use App\Http\Controllers\RcpController; // 🔥 Import kontrolera RCP
 */
 Route::post('/push/subscribe', [PushSubscriptionController::class, 'subscribe'])->name('push.subscribe');
 Route::get('/', [ShopController::class, 'index'])->name('shop.index');
+Route::get('/menu', [ShopController::class, 'menu'])->name('shop.menu');
 Route::post('/order/store', [OrderController::class, 'store'])->name('order.store');
 
 Route::prefix('payment')->group(function () {
@@ -69,7 +70,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/orders', [OrderAdminController::class, 'index'])->name('orders.index');
         Route::patch('/orders/{order}/status', [OrderAdminController::class, 'updateStatus'])->name('orders.update-status');
     });
-
 
     Route::middleware(['role:admin,manager'])->prefix('admin')->name('admin.')->group(function () {
         
@@ -165,7 +165,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/products', [ProductController::class, 'store'])->name('products.store');
             Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
             Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+            
+            // Warianty rozmiarowe (Szybkie dodawanie i usuwanie z poziomu modalu BOM)
+            Route::post('/products/{product}/variants', [ProductController::class, 'storeVariant'])->name('products.variants.store');
+            Route::delete('/products/variants/{variant}', [ProductController::class, 'destroyVariant'])->name('products.variants.destroy');
+            
+            // Receptury BOM per wariant
             Route::post('/products/variants/{variant}/recipe', [ProductController::class, 'saveRecipe'])->name('products.save_recipe');
+            Route::post('/bom/save-variant-recipe', [BomController::class, 'saveVariantRecipe'])->name('bom.save-variant-recipe');
         });
         
         // 📦 Gospodarka magazynowa surowców - Wymaga uprawnienia 'inventory.manage'
