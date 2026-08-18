@@ -1,165 +1,376 @@
 <script setup>
-import { computed } from 'vue';
-import { Link, usePage } from '@inertiajs/vue3';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { Link, usePage, router } from '@inertiajs/vue3';
+import { 
+    ShoppingCart, ChefHat, ShoppingBag, TrendingUp, Pizza, 
+    Package, Users, Banknote, Map, Settings, LogOut, Clock,
+    Play, Pause, Square, ChevronDown, ChevronRight, UserCheck
+} from 'lucide-vue-next';
 
-// Pobieramy dane zalogowanego użytkownika oraz jego uprawnienia przekazane przez Inertia
+const props = defineProps({
+    hideSidebar: {
+        type: Boolean,
+        default: false
+    }
+});
+
 const page = usePage();
 const user = computed(() => page.props.auth?.user);
 const userRole = computed(() => page.props.auth?.role || user.value?.role);
 const userPermissions = computed(() => page.props.auth?.permissions || []);
 
-// 🛡️ Funkcja pomocnicza do sprawdzania konkretnego uprawnienia
-const can = (permission) => {
-    if (userRole.value === 'admin' || userPermissions.value.includes('*')) {
-        return true; // Admin zawsze widzi wszystko
+// STAN I LOGIKA RCP (REJESTRACJA CZASU PRACY)
+const activeShift = computed(() => page.props.auth?.active_shift || null);
+const elapsedTime = ref('00:00:00');
+let timerInterval = null;
+
+const updateTimer = () => {
+    if (!activeShift.value || !activeShift.value.clock_in) {
+        elapsedTime.value = '00:00:00';
+        return;
     }
+
+    const start = new Date(activeShift.value.clock_in).getTime();
+    const now = new Date().getTime();
+    const diff = Math.max(0, Math.floor((now - start) / 1000));
+
+    const hours = String(Math.floor(diff / 3600)).padStart(2, '0');
+    const minutes = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
+    const seconds = String(diff % 60).padStart(2, '0');
+
+    elapsedTime.value = `${hours}:${minutes}:${seconds}`;
+};
+
+onMounted(() => {
+    updateTimer();
+    timerInterval = setInterval(updateTimer, 1000);
+});
+
+onUnmounted(() => {
+    if (timerInterval) clearInterval(timerInterval);
+});
+
+const startShift = () => {
+    router.post(route('rcp.clock-in'), {}, { preserveScroll: true });
+};
+
+const pauseShift = () => {
+    router.post(route('rcp.toggle-pause'), {}, { preserveScroll: true });
+};
+
+const stopShift = () => {
+    if (confirm('Czy na pewno chcesz zakończyć dzisiejszą zmianę?')) {
+        router.post(route('rcp.clock-out'), {}, { preserveScroll: true });
+    }
+};
+
+const can = (permission) => {
+    if (userRole.value === 'admin' || userPermissions.value.includes('*')) return true;
     return userPermissions.value.includes(permission);
 };
 
-// 🛡️ Funkcja pomocnicza sprawdzająca, czy użytkownik ma JAKIEKOLWIEK z podanych uprawnień
-const canAny = (permissionsArray) => {
-    return permissionsArray.some(p => can(p));
+const canAny = (permissionsArray) => permissionsArray.some(p => can(p));
+
+// STAN ROZSUWANEGO SUBMENU "ZARZĄDZANIE ZESPOŁEM"
+const isTeamMenuOpen = ref(
+    route().current('admin.users.*') || route().current('admin.rcp.*')
+);
+
+const toggleTeamMenu = () => {
+    isTeamMenuOpen.value = !isTeamMenuOpen.value;
 };
-
-// Lista wszystkich modułów w systemie powiązana z kluczami uprawnień RBAC
-const navigationItems = [
-    { 
-        name: 'Kasa POS (Kelner)', 
-        route: 'order.pos', 
-        icon: '🛒', 
-        condition: () => ['staff', 'waiter', 'manager', 'admin'].includes(userRole.value) 
-    },
-    { 
-        name: 'Ekran Kuchenny KDS', 
-        route: 'kds.index', 
-        icon: '👨‍🍳', 
-        condition: () => ['chef', 'manager', 'admin'].includes(userRole.value) 
-    },
-    { 
-        name: 'Dashboard Finansowy', 
-        route: 'manager.dashboard', 
-        icon: '📈', 
-        condition: () => ['manager', 'admin'].includes(userRole.value) 
-    },
-    { 
-        name: 'Kreator Menu i BOM', 
-        route: 'manager.products.index', 
-        icon: '🍕', 
-        permission: 'products.manage' 
-    },
-    { 
-        name: 'Magazyn Surowców', 
-        route: 'manager.inventory', 
-        icon: '📦', 
-        permission: 'inventory.manage' 
-    },
-    { 
-        name: 'Zarządzanie Zespołem', 
-        route: 'admin.users.index', 
-        icon: '👥', 
-        permission: 'users.manage' 
-    },
-    { 
-        name: 'Rozliczenia Kurierów', 
-        route: 'manager.reconciliation.index', 
-        icon: '💰', 
-        permission: 'reconciliation.view' 
-    },
-    { 
-        name: 'Strefy Dostaw', 
-        route: 'manager.delivery_zones.index', 
-        icon: '🗺️', 
-        permission: 'delivery_zones.manage' 
-    },
-    { 
-        name: 'Ustawienia Globalne', 
-        route: 'admin.settings.edit', 
-        icon: '⚙️', 
-        permissions: ['settings.general', 'settings.discounts', 'settings.payments'] 
-    },
-];
-
-// DYNAMICZNE FILTROWANIE LINKÓW NAWIGACJI
-const filteredNavigation = computed(() => {
-    return navigationItems.filter(item => {
-        // 1. Dostęp na podstawie roli bazowej (np. POS/KDS)
-        if (item.condition) {
-            return item.condition();
-        }
-        // 2. Dostęp na podstawie pojedynczego uprawnienia z macierzy
-        if (item.permission) {
-            return can(item.permission);
-        }
-        // 3. Dostęp na podstawie dowolnego uprawnienia z listy (np. Ustawienia)
-        if (item.permissions) {
-            return canAny(item.permissions);
-        }
-        return false;
-    });
-});
 </script>
 
 <template>
-    <div class="min-h-screen bg-slate-950 text-white flex flex-col md:flex-row">
-        <!-- BOCZNY PANEL NAWIGACYJNY (SIDEBAR) -->
-        <aside class="w-full md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between p-4 shrink-0">
+    <div class="min-h-screen bg-[#0B0F19] text-slate-300 flex flex-col md:flex-row font-sans antialiased">
+        
+        <!-- SIDEBAR (Ukrywany gdy hideSidebar === true) -->
+        <aside v-if="!hideSidebar" class="w-full md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between p-4 shrink-0 shadow-2xl">
             <div>
-                <!-- LOGO LOKALU -->
-                <div class="mb-8 px-2 py-4 border-b border-slate-800">
-                    <div class="text-lg font-black tracking-widest text-orange-500">SAVONA ERP</div>
-                    <div class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">System Zarządzania Gastronomią</div>
+                <!-- LOGO -->
+                <div class="mb-6 px-2 py-3 border-b border-slate-800 flex items-center space-x-2">
+                    <span class="text-xl font-black text-red-500 tracking-wider">SAVONA</span>
+                    <span class="text-[10px] bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">erp</span>
                 </div>
 
-                <!-- PROFIL PRACOWNIKA -->
-                <div class="mb-6 p-3 bg-slate-950 rounded-xl border border-slate-850 flex items-center space-x-3">
-                    <div class="h-8 w-8 rounded-full bg-slate-800 flex items-center justify-center font-bold text-sm text-orange-400">
+                <!-- DANE ZALOGOWANEGO UŻYTKOWNIKA -->
+                <div class="mb-4 p-3 bg-[#0B0F19] rounded-2xl border border-slate-800 flex items-center space-x-3">
+                    <div class="h-9 w-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-sm text-amber-500 shrink-0">
                         {{ user?.name?.charAt(0) }}
                     </div>
                     <div class="overflow-hidden">
-                        <div class="text-xs font-bold text-slate-200 truncate">{{ user?.name }}</div>
-                        <span :class="{
-                            'bg-red-950 text-red-400 border-red-900': userRole === 'admin',
-                            'bg-purple-950 text-purple-400 border-purple-900': userRole === 'manager',
-                            'bg-blue-950 text-blue-400 border-blue-900': userRole === 'chef',
-                            'bg-orange-950 text-orange-400 border-orange-900': ['waiter', 'staff'].includes(userRole),
-                            'bg-emerald-950 text-emerald-400 border-emerald-900': userRole === 'driver'
-                        }" class="text-[9px] px-1.5 py-0.5 rounded border font-black uppercase tracking-wider block w-max mt-0.5">
+                        <div class="text-xs font-bold text-white truncate">{{ user?.name }}</div>
+                        <span class="text-[9px] px-2 py-0.5 rounded-lg border font-bold uppercase tracking-wider block w-max mt-0.5 bg-amber-950/60 text-amber-400 border-amber-900">
                             {{ userRole }}
                         </span>
                     </div>
                 </div>
 
-                <!-- DYNAMICZNE LINKI MIGRACYJNE -->
+                <!-- WIDGET REJESTRACJI CZASU PRACY (RCP) IN-SIDEBAR -->
+                <div class="mb-6 p-3 bg-[#0B0F19] rounded-2xl border border-slate-800 space-y-2.5">
+                    <div class="flex justify-between items-center border-b border-slate-800/80 pb-2">
+                        <div class="flex items-center space-x-1.5">
+                            <Clock class="w-3.5 h-3.5 text-amber-500" />
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Czas Zmiany (RCP)</span>
+                        </div>
+                        <div class="flex items-center space-x-1">
+                            <span v-if="activeShift?.status === 'working'" class="relative flex h-2 w-2">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                            <span :class="{
+                                'text-emerald-400': activeShift?.status === 'working',
+                                'text-amber-400': activeShift?.status === 'on_break',
+                                'text-slate-500': !activeShift
+                            }" class="text-[9px] font-bold uppercase">
+                                {{ activeShift?.status === 'working' ? 'Praca' : activeShift?.status === 'on_break' ? 'Pauza' : 'Offline' }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-black font-mono text-white tracking-wider">{{ elapsedTime }}</span>
+
+                        <div class="flex items-center space-x-1">
+                            <button 
+                                v-if="!activeShift" 
+                                @click="startShift" 
+                                class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-xl text-[10px] font-bold uppercase transition flex items-center space-x-1 cursor-pointer"
+                            >
+                                <Play class="w-3 h-3 fill-current" />
+                                <span>Start</span>
+                            </button>
+
+                            <template v-else>
+                                <button 
+                                    @click="pauseShift" 
+                                    :class="activeShift.status === 'on_break' ? 'bg-amber-500 text-black' : 'bg-slate-800 text-amber-400 hover:bg-slate-700'"
+                                    class="p-1.5 rounded-xl text-xs font-bold transition cursor-pointer"
+                                    :title="activeShift.status === 'on_break' ? 'Wznów pracę' : 'Rozpocznij przerwę'"
+                                >
+                                    <Pause class="w-3 h-3 fill-current" />
+                                </button>
+
+                                <button 
+                                    @click="stopShift" 
+                                    class="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 px-2 py-1 rounded-xl text-[10px] font-bold uppercase transition flex items-center space-x-1 cursor-pointer"
+                                >
+                                    <Square class="w-3 h-3 fill-current" />
+                                    <span>Stop</span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NAWIGACJA -->
                 <nav class="space-y-1">
                     <Link 
-                        v-for="item in filteredNavigation" 
-                        :key="item.route" 
-                        :href="route(item.route)"
-                        :class="route().current(item.route) ? 'bg-orange-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-850 hover:text-slate-200'"
-                        class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all"
+                        v-if="canAny(['staff', 'waiter', 'manager', 'admin']) || userRole === 'waiter'"
+                        :href="route('order.pos')" 
+                        :class="route().current('order.pos') || route().current('pos.*') ? 'bg-red-600 text-white font-bold border-red-500 shadow-lg shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
+                        class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider border transition-all"
                     >
-                        <span>{{ item.icon }}</span>
-                        <span>{{ item.name }}</span>
+                        <ShoppingCart class="w-4 h-4 text-amber-500 shrink-0" />
+                        <span>Kasa POS (Kelner)</span>
+                    </Link>
+
+                    <Link 
+                        v-if="['chef', 'manager', 'admin'].includes(userRole)"
+                        :href="route('kds.index')" 
+                        :class="route().current('kds.*') ? 'bg-red-600 text-white font-bold border-red-500 shadow-lg shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
+                        class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider border transition-all"
+                    >
+                        <ChefHat class="w-4 h-4 text-amber-500 shrink-0" />
+                        <span>Ekran Kuchenny KDS</span>
+                    </Link>
+
+                    <Link 
+                        v-if="['manager', 'admin'].includes(userRole)"
+                        :href="route('admin.orders.index')" 
+                        :class="route().current('admin.orders.*') ? 'bg-red-600 text-white font-bold border-red-500 shadow-lg shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
+                        class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider border transition-all"
+                    >
+                        <ShoppingBag class="w-4 h-4 text-amber-500 shrink-0" />
+                        <span>Lista Zamówień</span>
+                    </Link>
+
+                    <Link 
+                        v-if="['manager', 'admin'].includes(userRole)"
+                        :href="route('manager.dashboard')" 
+                        :class="route().current('manager.dashboard') ? 'bg-red-600 text-white font-bold border-red-500 shadow-lg shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
+                        class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider border transition-all"
+                    >
+                        <TrendingUp class="w-4 h-4 text-amber-500 shrink-0" />
+                        <span>Dashboard Finansowy</span>
+                    </Link>
+
+                    <Link 
+                        v-if="can('products.manage')"
+                        :href="route('manager.products.index')" 
+                        :class="route().current('manager.products.*') ? 'bg-red-600 text-white font-bold border-red-500 shadow-lg shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
+                        class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider border transition-all"
+                    >
+                        <Pizza class="w-4 h-4 text-amber-500 shrink-0" />
+                        <span>Kreator Menu i BOM</span>
+                    </Link>
+
+                    <Link 
+                        v-if="can('inventory.manage')"
+                        :href="route('manager.inventory')" 
+                        :class="route().current('manager.inventory*') ? 'bg-red-600 text-white font-bold border-red-500 shadow-lg shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
+                        class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider border transition-all"
+                    >
+                        <Package class="w-4 h-4 text-amber-500 shrink-0" />
+                        <span>Magazyn Surowców</span>
+                    </Link>
+
+                    <!-- ROZSUWANE SUBMENU: ZARZĄDZANIE ZESPOŁEM (Admin / Manager) -->
+                    <div v-if="can('users.manage') || ['admin', 'manager'].includes(userRole)" class="space-y-1">
+                        <button 
+                            @click="toggleTeamMenu"
+                            :class="route().current('admin.users.*') || route().current('admin.rcp.*') ? 'text-white font-bold bg-slate-800/80 border-slate-700' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
+                            class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider border transition-all cursor-pointer"
+                        >
+                            <div class="flex items-center space-x-3">
+                                <Users class="w-4 h-4 text-amber-500 shrink-0" />
+                                <span>Zarządzanie Zespołem</span>
+                            </div>
+                            <component :is="isTeamMenuOpen ? ChevronDown : ChevronRight" class="w-4 h-4 text-slate-500" />
+                        </button>
+
+                        <div v-show="isTeamMenuOpen" class="pl-4 space-y-1 pt-1 border-l-2 border-slate-800 ml-3">
+                            <Link 
+                                :href="route('admin.users.index')"
+                                :class="route().current('admin.users.*') ? 'bg-red-600 text-white font-bold border-red-500' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
+                                class="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-[11px] uppercase tracking-wider border transition-all"
+                            >
+                                <UserCheck class="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                <span>Lista Pracowników</span>
+                            </Link>
+
+                            <Link 
+                                :href="route('admin.rcp.index')"
+                                :class="route().current('admin.rcp.*') ? 'bg-red-600 text-white font-bold border-red-500' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
+                                class="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-[11px] uppercase tracking-wider border transition-all"
+                            >
+                                <Clock class="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                <span>Ewidencja Czasu Pracy (RCP)</span>
+                            </Link>
+                        </div>
+                    </div>
+
+                    <Link 
+                        v-if="can('reconciliation.view')"
+                        :href="route('manager.reconciliation.index')" 
+                        :class="route().current('manager.reconciliation.*') ? 'bg-red-600 text-white font-bold border-red-500 shadow-lg shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
+                        class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider border transition-all"
+                    >
+                        <Banknote class="w-4 h-4 text-amber-500 shrink-0" />
+                        <span>Rozliczenia Kurierów</span>
+                    </Link>
+
+                    <Link 
+                        v-if="can('delivery_zones.manage')"
+                        :href="route('manager.delivery_zones.index')" 
+                        :class="route().current('manager.delivery_zones.*') ? 'bg-red-600 text-white font-bold border-red-500 shadow-lg shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
+                        class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider border transition-all"
+                    >
+                        <Map class="w-4 h-4 text-amber-500 shrink-0" />
+                        <span>Strefy Dostaw</span>
+                    </Link>
+
+                    <Link 
+                        v-if="canAny(['settings.general', 'settings.discounts', 'settings.payments'])"
+                        :href="route('admin.settings.edit')" 
+                        :class="route().current('admin.settings.*') ? 'bg-red-600 text-white font-bold border-red-500 shadow-lg shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
+                        class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider border transition-all"
+                    >
+                        <Settings class="w-4 h-4 text-amber-500 shrink-0" />
+                        <span>Ustawienia Globalne</span>
                     </Link>
                 </nav>
             </div>
 
-            <!-- WYLOGOWANIE Z SYSTEMU -->
+            <!-- PRZYCISK WYLOGOWANIA -->
             <div class="pt-4 border-t border-slate-800 mt-6">
-                <Link 
-                    :href="route('logout')" 
-                    method="post" 
-                    as="button" 
-                    class="w-full bg-slate-950 hover:bg-red-950/40 text-red-400 hover:text-red-300 border border-slate-850 hover:border-red-900 text-xs font-bold py-2.5 rounded-xl uppercase tracking-wider transition-all"
-                >
-                    🚪 Wyloguj pracownika
+                <Link :href="route('logout')" method="post" as="button" class="w-full bg-[#0B0F19] hover:bg-red-950/40 text-red-400 border border-slate-800 hover:border-red-900 text-xs font-bold py-2.5 rounded-xl uppercase tracking-wider transition flex items-center justify-center space-x-2 cursor-pointer">
+                    <LogOut class="w-4 h-4" />
+                    <span>Wyloguj pracownika</span>
                 </Link>
             </div>
         </aside>
 
-        <!-- CENTRALNY KONTENER DLA PODSTRON (DYNAMICZNY CONTENT) -->
-        <main class="flex-1 overflow-y-auto max-h-screen">
-            <slot />
+        <!-- WIDOK GŁÓWNY -->
+        <main class="flex-1 overflow-y-auto max-h-screen flex flex-col">
+            <!-- PASEK GÓRNY GDY SIDEBAR JEST UKRYTY (np. Ekran Kuchenny KDS / Kasa POS) -->
+            <header v-if="hideSidebar" class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between shrink-0 shadow-lg">
+                <div class="flex items-center space-x-3">
+                    <span class="text-lg font-black text-red-500 tracking-wider">SAVONA</span>
+                    <span class="text-[9px] bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full font-bold uppercase">erp</span>
+                </div>
+
+                <!-- TOP-BAR WIDGET RCP DLA KUCHARZA / KELNERA -->
+                <div class="flex items-center space-x-4">
+                    <div class="bg-[#0B0F19] border border-slate-800 px-3.5 py-1.5 rounded-2xl flex items-center space-x-3 shadow-inner">
+                        <div class="flex items-center space-x-2">
+                            <span v-if="activeShift?.status === 'working'" class="relative flex h-2 w-2">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                            <Clock class="w-4 h-4 text-amber-500" />
+                            <div class="flex flex-col">
+                                <span class="text-[9px] font-bold uppercase tracking-wider text-slate-500">Czas pracy</span>
+                                <span class="text-xs font-mono font-black text-white">{{ elapsedTime }}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="h-6 w-px bg-slate-800"></div>
+
+                        <div class="flex items-center space-x-1.5">
+                            <button 
+                                v-if="!activeShift" 
+                                @click="startShift" 
+                                class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center space-x-1 cursor-pointer"
+                            >
+                                <Play class="w-3.5 h-3.5 fill-current" />
+                                <span>Start Pracy</span>
+                            </button>
+
+                            <template v-else>
+                                <button 
+                                    @click="pauseShift" 
+                                    :class="activeShift.status === 'on_break' ? 'bg-amber-500 text-black' : 'bg-slate-800 text-amber-400 hover:bg-slate-700'"
+                                    class="px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer"
+                                    :title="activeShift.status === 'on_break' ? 'Wznów pracę' : 'Rozpocznij przerwę'"
+                                >
+                                    <Pause class="w-3.5 h-3.5 fill-current" />
+                                </button>
+
+                                <button 
+                                    @click="stopShift" 
+                                    class="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 px-2.5 py-1 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center space-x-1 cursor-pointer"
+                                >
+                                    <Square class="w-3.5 h-3.5 fill-current" />
+                                    <span>Koniec</span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2 border-l border-slate-800 pl-4">
+                        <span class="text-xs font-bold text-white hidden sm:inline">{{ user?.name }}</span>
+                        <Link :href="route('logout')" method="post" as="button" class="text-slate-400 hover:text-red-400 p-1.5 rounded-xl hover:bg-slate-800 transition" title="Wyloguj">
+                            <LogOut class="w-4 h-4" />
+                        </Link>
+                    </div>
+                </div>
+            </header>
+
+            <div class="flex-1">
+                <slot />
+            </div>
         </main>
+
     </div>
 </template>

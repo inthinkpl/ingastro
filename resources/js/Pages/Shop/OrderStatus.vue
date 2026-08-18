@@ -3,8 +3,7 @@ import { onMounted, onUnmounted, computed } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
 import { 
     ClipboardList, Flame, Package, Store, Car, PartyPopper, 
-    XCircle, Hourglass, Phone, ArrowLeft, MapPin, CreditCard, 
-    CheckCircle2, Truck, PackageCheck, AlertCircle
+    XCircle, Hourglass, Phone, ArrowLeft, MapPin, CreditCard
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -35,103 +34,138 @@ onUnmounted(() => {
     if (pollInterval) clearInterval(pollInterval);
 });
 
-// Sformatowana nazwa statusu do wyświetlenia w pigułce
+// Czytelny opis statusu w pigułce z podziałem na dostawę i odbiór
 const readableStatus = computed(() => {
     const isDelivery = props.order.type === 'dostawa';
-    const statusMap = {
-        'nowe': 'Przyjęte do realizacji',
-        'w_przygotowaniu': 'W przygotowaniu w kuchni',
-        'gotowe': isDelivery ? 'Czeka na kuriera' : 'Gotowe do odbioru',
-        'w_dostawie': 'W trasie z kurierem',
-        'w drodze': 'W trasie z kurierem',
-        'dostarczone': 'Dostarczone',
-        'wydane': 'Wydane klientowi',
-        'anulowane': 'Zamówienie anulowane'
-    };
-    return statusMap[props.order.status] || props.order.status;
+    const status = props.order.status;
+
+    if (status === 'anulowane') return 'Zamówienie anulowane';
+
+    if (isDelivery) {
+        if (status === 'nowe') return 'Przyjęte do realizacji';
+        if (status === 'w_przygotowaniu') return 'W przygotowaniu w kuchni';
+        if (status === 'gotowe') return 'Wypieczone – czeka na kuriera';
+        if (['w_dostawie', 'w drodze', 'wydane'].includes(status)) return 'W trasie z kurierem';
+        if (['dostarczone', 'zrealizowane'].includes(status)) return 'Dostarczone do klienta';
+    } else {
+        if (status === 'nowe') return 'Przyjęte do realizacji';
+        if (status === 'w_przygotowaniu') return 'W przygotowaniu w kuchni';
+        if (status === 'gotowe') return 'Gotowe do odbioru w lokalu';
+        if (['wydane', 'dostarczone', 'zrealizowane'].includes(status)) return 'Wydane klientowi';
+    }
+
+    return status;
 });
 
-// Wyliczanie numerycznego etapu postępu (1, 2, 3, 4)
+// PRECYZYJNE ROZDZIELENIE KROKÓW (1, 2, 3, 4):
 const currentStep = computed(() => {
     const status = props.order.status;
     const isDelivery = props.order.type === 'dostawa';
 
     if (status === 'nowe') return 1;
     if (status === 'w_przygotowaniu') return 2;
-    if (status === 'gotowe') {
-        return isDelivery ? 2 : 3;
+
+    if (isDelivery) {
+        // DLA DOSTAWY:
+        // 'gotowe' = zrobione w kuchni, czeka na kuriera (Krok 2)
+        // 'wydane' / 'w_dostawie' / 'w drodze' = kucharz wydał z kuchni kurierowi (Krok 3)
+        // 'dostarczone' / 'zrealizowane' = dostawca przekazał klientowi (Krok 4)
+        if (status === 'gotowe') return 2;
+        if (['w_dostawie', 'w drodze', 'wydane'].includes(status)) return 3;
+        if (['dostarczone', 'zrealizowane'].includes(status)) return 4;
+    } else {
+        // DLA ODBIORU OSOBISTEGO (wynos):
+        // 'gotowe' = gotowa do odbioru przy ladzie (Krok 3)
+        // 'wydane' / 'dostarczone' / 'zrealizowane' = odebrane przez klienta (Krok 4)
+        if (status === 'gotowe') return 3;
+        if (['wydane', 'dostarczone', 'zrealizowane'].includes(status)) return 4;
     }
-    if (['w_dostawie', 'w drodze'].includes(status)) return 3;
-    if (['dostarczone', 'wydane'].includes(status)) return 4;
+
     return 1;
 });
 
-// Dynamiczny tytuł, opis i ikona SVG stanu
+// Dynamiczne nagłówki, opisy i ikony SVG
 const statusMeta = computed(() => {
     const status = props.order.status;
     const isDelivery = props.order.type === 'dostawa';
 
-    switch (status) {
-        case 'nowe':
+    if (status === 'anulowane') {
+        return {
+            title: 'Zamówienie anulowane',
+            desc: 'Przepraszamy, to zamówienie zostało anulowane. W razie pytań prosimy o kontakt z obsługą.',
+            badgeColor: 'bg-red-500/10 text-red-400 border-red-500/30',
+            icon: XCircle
+        };
+    }
+
+    if (status === 'nowe') {
+        return {
+            title: 'Zamówienie przyjęte',
+            desc: 'Twoje zamówienie trafiło do pizzerii. Kucharze wkrótce rozpoczną jego przygotowanie.',
+            badgeColor: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+            icon: ClipboardList
+        };
+    }
+
+    if (status === 'w_przygotowaniu') {
+        return {
+            title: 'Wypiekamy w piecu',
+            desc: 'Ciasto dojrzewało 48 godzin! Nasz pizzaiolo właśnie przygotowuje i wypieka Twoje danie.',
+            badgeColor: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+            icon: Flame
+        };
+    }
+
+    if (isDelivery) {
+        if (status === 'gotowe') {
             return {
-                title: 'Zamówienie przyjęte',
-                desc: 'Twoje zamówienie trafiło do pizzerii. Kucharze wkrótce rozpoczną jego przygotowanie.',
-                badgeColor: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-                icon: ClipboardList
-            };
-        case 'w_przygotowaniu':
-            return {
-                title: 'Wypiekamy w piecu',
-                desc: 'Ciasto dojrzewało 48 godzin! Nasz pizzaiolo właśnie przygotowuje i wypieka Twoje danie.',
+                title: 'Gotowe w kuchni',
+                desc: 'Pizza została wypieczona i spakowana. Czeka w pizzerii na odbiór przez kuriera.',
                 badgeColor: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-                icon: Flame
+                icon: Package
             };
-        case 'gotowe':
-            if (isDelivery) {
-                return {
-                    title: 'Oczekuje na kuriera',
-                    desc: 'Pizza jest już wypieczona, spakowana w torbę termoizolacyjną i czeka na odbiór przez dostawcę.',
-                    badgeColor: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-                    icon: Package
-                };
-            }
+        }
+        if (['w_dostawie', 'w drodze', 'wydane'].includes(status)) {
+            return {
+                title: 'W trasie z kurierem',
+                desc: 'Zamówienie zostało przekazane kurierowi. Jedzie pod Twój adres!',
+                badgeColor: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+                icon: Car
+            };
+        }
+        if (['dostarczone', 'zrealizowane'].includes(status)) {
+            return {
+                title: 'Smacznego!',
+                desc: 'Zamówienie zostało pomyślnie dostarczone. Dziękujemy za wybór Pizzerii Savona!',
+                badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+                icon: PartyPopper
+            };
+        }
+    } else {
+        if (status === 'gotowe') {
             return {
                 title: 'Gotowe do odbioru!',
                 desc: 'Zapraszamy do pizzerii! Twoje zamówienie czeka gotowe przy ladzie.',
                 badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
                 icon: Store
             };
-        case 'w_dostawie':
-        case 'w drodze':
-            return {
-                title: 'W trasie z kurierem',
-                desc: 'Kurier odebrał zamówienie z kuchni i jedzie pod Twój adres.',
-                badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-                icon: Car
-            };
-        case 'dostarczone':
-        case 'wydane':
+        }
+        if (['wydane', 'dostarczone', 'zrealizowane'].includes(status)) {
             return {
                 title: 'Smacznego!',
-                desc: 'Zamówienie zostało pomyślnie zrealizowane. Dziękujemy za wybór Pizzerii Savona!',
+                desc: 'Zamówienie zostało odebrane. Dziękujemy za wybór Pizzerii Savona!',
                 badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
                 icon: PartyPopper
             };
-        case 'anulowane':
-            return {
-                title: 'Zamówienie anulowane',
-                desc: 'Przepraszamy, to zamówienie zostało anulowane. W razie pytań prosimy o kontakt z obsługą.',
-                badgeColor: 'bg-red-500/10 text-red-400 border-red-500/30',
-                icon: XCircle
-            };
-        default:
-            return {
-                title: 'Przetwarzanie',
-                desc: 'Status zamówienia jest aktualizowany...',
-                badgeColor: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
-                icon: Hourglass
-            };
+        }
     }
+
+    return {
+        title: 'Przetwarzanie',
+        desc: 'Status zamówienia jest aktualizowany...',
+        badgeColor: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
+        icon: Hourglass
+    };
 });
 </script>
 

@@ -38,4 +38,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Order::class, 'driver_id');
     }
+
+    public function workShifts()
+    {
+    return $this->hasMany(\App\Models\WorkShift::class);
+    }
 }

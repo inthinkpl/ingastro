@@ -14,12 +14,14 @@ use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\DiscountCodeController;
 use App\Http\Controllers\Admin\RolePermissionController;
+use App\Http\Controllers\Admin\OrderAdminController;
 
 use App\Http\Controllers\Manager\ProductController;
 use App\Http\Controllers\Manager\DeliveryZoneController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\DriverDeliveryController;
 use App\Http\Controllers\PushSubscriptionController;
+use App\Http\Controllers\RcpController; // 🔥 Import kontrolera RCP
 
 
 /*
@@ -54,10 +56,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', function () { return Inertia::render('Dashboard'); })->name('dashboard');
 
     /*
+     * ─── ⏱️ REJESTRACJA CZASU PRACY (RCP) - SZYBKIE AKCJE DLA KAŻDEGO PRACOWNIKA ───
+     */
+    Route::post('/rcp/clock-in', [RcpController::class, 'clockIn'])->name('rcp.clock-in');
+    Route::post('/rcp/toggle-pause', [RcpController::class, 'togglePause'])->name('rcp.toggle-pause');
+    Route::post('/rcp/clock-out', [RcpController::class, 'clockOut'])->name('rcp.clock-out');
+
+    /*
      * ─── MODUŁ ADMINISTRATORA I USTAWIEŃ GLOBALNYCH (Dostęp: Admin + Manager) ───
      */
+    Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/orders', [OrderAdminController::class, 'index'])->name('orders.index');
+        Route::patch('/orders/{order}/status', [OrderAdminController::class, 'updateStatus'])->name('orders.update-status');
+    });
+
+
     Route::middleware(['role:admin,manager'])->prefix('admin')->name('admin.')->group(function () {
         
+        // ⏱️ Rejestracja Czasu Pracy (RCP) - Panel Ewidencji i Korekt
+        Route::get('/rcp', [RcpController::class, 'index'])->name('rcp.index');
+        Route::post('/rcp', [RcpController::class, 'store'])->name('rcp.store');
+        Route::put('/rcp/{shift}', [RcpController::class, 'update'])->name('rcp.update');
+
         // Główne Ustawienia (Wizytówka, Powiadomienia Push, Bramki Płatności)
         Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.edit');
         Route::post('/settings', [SettingsController::class, 'save'])->name('settings.save');
