@@ -5,7 +5,7 @@ import axios from 'axios';
 import { 
     Pizza, ShoppingBag, Phone, MapPin, Car, Store, 
     AlertTriangle, Send, X, Loader2, Utensils, Flame, Sparkles, 
-    Menu as MenuIcon, Truck
+    Menu as MenuIcon, Truck, Plus
 } from 'lucide-vue-next';
 import { useCart } from '@/Composables/useCart';
 
@@ -16,6 +16,10 @@ const props = defineProps({
     freeDeliverySettings: { 
         type: Object, 
         default: () => ({ enabled: false, minAmount: 60.00 }) 
+    },
+    upsellSettings: {
+        type: Object,
+        default: () => ({ enabled: true })
     }
 });
 
@@ -35,6 +39,34 @@ const freeDeliveryProgress = computed(() => {
     if (target <= 0) return 100;
     return Math.min(100, Math.round((cartSubtotal.value / target) * 100));
 });
+
+// Wyciąganie produktów do sekcji Upsell (Sosy, Napoje, Dodatki)
+const upsellProducts = computed(() => {
+    if (!props.upsellSettings?.enabled) return [];
+    
+    // Pobieramy produkty z kategorii Sosy, Napoje, Dodatki lub po prostu niebędące Pizzą
+    const categoriesToSuggest = ['sosy', 'napoje', 'dodatki', 'napój', 'sos'];
+    
+    return props.products.filter(p => {
+        const catName = p.category?.toLowerCase() || '';
+        return categoriesToSuggest.some(c => catName.includes(c)) && p.variants?.length > 0;
+    }).slice(0, 6); // Maksymalnie 6 pozycji
+});
+
+// Dodanie sugerowanego produktu 1-kliknięciem
+const addUpsellItem = (product) => {
+    const variant = product.variants[0];
+    if (!variant) return;
+
+    addToCart({
+        variantId: variant.id,
+        name: product.name,
+        size: variant.size_name,
+        price: parseFloat(variant.price),
+        quantity: 1,
+        modifiers: []
+    });
+};
 
 // Stan modali i nawigacji mobilnej
 const isModifierModalOpen = ref(false);
@@ -81,10 +113,8 @@ const handleVariantSelect = (product, variant) => {
     const hasIngredients = variant.ingredients && variant.ingredients.length > 0;
 
     if (isPizza && hasIngredients) {
-        // Otwórz modal modyfikacji tylko dla pizzy
         openModifierModal(product, variant);
     } else {
-        // Wszystkie inne kategorie (napoje, sałatki, makarony, sosy itp.) -> od razu do koszyka
         addToCart({
             variantId: variant.id,
             name: product.name,
@@ -162,34 +192,6 @@ const minOrderWarning = computed(() => {
     return null;
 });
 
-const applyDiscountCode = async () => {
-    if (!discountCodeInput.value) return;
-    discountError.value = null;
-    isValidatingCode.value = true;
-
-    try {
-        const response = await axios.post(route('discount.validate'), {
-            code: discountCodeInput.value,
-            subtotal: cartSubtotal.value
-        });
-        appliedDiscount.value = response.data;
-        form.discount_code = response.data.code;
-    } catch (error) {
-        appliedDiscount.value = null;
-        form.discount_code = '';
-        discountError.value = error.response?.data?.message || 'Błąd kodu.';
-    } finally {
-        isValidatingCode.value = false;
-    }
-};
-
-const removeDiscountCode = () => {
-    appliedDiscount.value = null;
-    discountCodeInput.value = '';
-    form.discount_code = '';
-    discountError.value = null;
-};
-
 const checkout = () => {
     if (cart.value.length === 0 || minOrderWarning.value) return;
 
@@ -225,17 +227,15 @@ const scrollToSection = (id) => {
 <template>
     <div class="bg-[#0B0F19] text-slate-300 font-sans antialiased selection:bg-red-500 selection:text-white min-h-screen">
 
-        <!-- HEADER (IDENTYCZNY JAK NA STRONIE GŁÓWNEJ) -->
+        <!-- HEADER -->
         <header class="sticky top-0 z-50 bg-[#0B0F19]/90 backdrop-blur-md border-b border-slate-900 shadow-xl">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
                 
-                <!-- LOGO STRONY -->
                 <Link :href="route('shop.index')" class="flex items-center space-x-2 cursor-pointer">
                     <span class="text-2xl font-bold text-red-500 tracking-wider">SAVONA</span>
                     <span class="text-xs bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full font-semibold">pizza</span>
                 </Link>
                 
-                <!-- MENU DESKTOP -->
                 <nav class="hidden md:flex items-center space-x-8 font-medium text-sm">
                     <Link :href="route('shop.index') + '#o-nas'" class="text-slate-300 hover:text-red-500 transition cursor-pointer">O nas</Link>
                     
@@ -250,7 +250,6 @@ const scrollToSection = (id) => {
                     <Link :href="route('shop.index') + '#kontakt'" class="text-slate-300 hover:text-red-500 transition cursor-pointer">Kontakt</Link>
                 </nav>
 
-                <!-- AKCJE PO PRAWEJ STRONIE HEADER-A -->
                 <div class="flex items-center space-x-3">
                     <a href="tel:+48785555455" class="border border-slate-700 hover:border-slate-500 hover:text-white text-slate-300 px-3 sm:px-5 py-2.5 rounded-full font-semibold transition inline-flex items-center space-x-2 shadow-sm text-sm sm:text-base">
                         <Phone class="w-4 h-4 text-amber-500" />
@@ -265,14 +264,12 @@ const scrollToSection = (id) => {
                         </span>
                     </button>
 
-                    <!-- HAMBURGER MENU DLA SMARTFONÓW -->
                     <button @click="isMobileMenuOpen = !isMobileMenuOpen" class="md:hidden p-2 text-slate-400 hover:text-white">
                         <MenuIcon class="w-6 h-6" />
                     </button>
                 </div>
             </div>
 
-            <!-- ROZWIJANE MENU MOBILNE -->
             <div v-if="isMobileMenuOpen" class="md:hidden bg-slate-900 border-b border-slate-800 px-4 py-4 space-y-3 text-sm">
                 <Link :href="route('shop.index') + '#o-nas'" class="block text-slate-300 py-1">O nas</Link>
                 <Link :href="route('shop.menu')" class="block text-amber-400 font-bold py-1 flex items-center space-x-2">
@@ -283,10 +280,9 @@ const scrollToSection = (id) => {
             </div>
         </header>
 
-        <!-- SEKCJA GŁÓWNA: KAFELKI KATEGORII + LISTA DAŃ + KOSZYK -->
+        <!-- SEKCJA GŁÓWNA -->
         <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
             
-            <!-- TYTUŁ I KAFELKI KATEGORII -->
             <div class="space-y-4">
                 <div class="flex justify-between items-end border-b border-slate-900 pb-4">
                     <div>
@@ -295,7 +291,6 @@ const scrollToSection = (id) => {
                     </div>
                 </div>
 
-                <!-- KAFELKI KATEGORII -->
                 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                     <button 
                         v-for="cat in uniqueCategories" 
@@ -375,7 +370,6 @@ const scrollToSection = (id) => {
                             </span>
                         </div>
 
-                        <!-- PASEK PROGRESU -->
                         <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
                             <div 
                                 class="h-full transition-all duration-500 ease-out rounded-full"
@@ -389,7 +383,8 @@ const scrollToSection = (id) => {
                         </p>
                     </div>
 
-                    <div class="space-y-2.5 max-h-[40vh] overflow-y-auto pr-1">
+                    <!-- LISTA W KOSZYKU -->
+                    <div class="space-y-2.5 max-h-[35vh] overflow-y-auto pr-1">
                         <div v-for="(item, idx) in cart" :key="idx" class="bg-[#0B0F19] p-3 rounded-xl border border-slate-800 text-xs space-y-1">
                             <div class="flex justify-between items-start">
                                 <div>
@@ -418,6 +413,36 @@ const scrollToSection = (id) => {
 
                         <div v-if="cart.length === 0" class="text-center py-8 text-xs text-slate-500 italic">
                             Koszyk jest pusty. Wybierz danie z listy.
+                        </div>
+                    </div>
+
+                    <!-- SEKCJA UP-SELLING: CZĘSTO ZAMAWIANE RAZEM -->
+                    <div v-if="upsellSettings?.enabled && cart.length > 0 && upsellProducts.length > 0" class="pt-3 border-t border-slate-800 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center space-x-1">
+                                <Sparkles class="w-3.5 h-3.5" />
+                                <span>Często zamawiane razem</span>
+                            </span>
+                        </div>
+
+                        <div class="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                            <div 
+                                v-for="item in upsellProducts" 
+                                :key="item.id"
+                                class="bg-[#0B0F19] p-2 rounded-xl border border-slate-800 shrink-0 w-32 flex flex-col justify-between text-left space-y-1.5"
+                            >
+                                <div>
+                                    <span class="text-[11px] font-bold text-white block truncate">{{ item.name }}</span>
+                                    <span class="text-[10px] text-amber-400 font-mono font-bold block">{{ item.variants[0]?.price }} zł</span>
+                                </div>
+                                <button 
+                                    @click="addUpsellItem(item)"
+                                    class="w-full bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-200 py-1 rounded-lg text-[10px] font-bold uppercase transition flex items-center justify-center space-x-0.5 cursor-pointer"
+                                >
+                                    <Plus class="w-3 h-3" />
+                                    <span>Dodaj</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
 

@@ -1,6 +1,6 @@
 <script setup>
 import { useForm } from '@inertiajs/vue3';
-import { Save, Loader2, Truck } from 'lucide-vue-next';
+import { Save, Loader2, Truck, Sparkles } from 'lucide-vue-next';
 
 const props = defineProps({
     restaurantName: { type: String, default: '' },
@@ -9,6 +9,7 @@ const props = defineProps({
     minOrderAmount: { type: [Number, String], default: 40.00 },
     freeDeliveryEnabled: { type: Boolean, default: false },
     freeDeliveryMinAmount: { type: [Number, String], default: 60.00 },
+    upsellEnabled: { type: Boolean, default: true },
     currentGateway: { type: String, default: 'simulation' },
     payuEnv: { type: String, default: 'sandbox' },
     payuPosId: { type: String, default: '' },
@@ -24,6 +25,7 @@ const form = useForm({
     min_order_amount: props.minOrderAmount,
     free_delivery_enabled: props.freeDeliveryEnabled,
     free_delivery_min_amount: props.freeDeliveryMinAmount,
+    upsell_enabled: props.upsellEnabled,
     payment_gateway: props.currentGateway,
     payu_env: props.payuEnv,
     payu_pos_id: props.payuPosId,
@@ -141,6 +143,29 @@ const submit = () => {
                         />
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- SEKCJA UP-SELLING / CZĘSTO ZAMAWIANE RAZEM -->
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+            <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wide border-b border-slate-800 pb-3 flex items-center space-x-2">
+                <Sparkles class="w-4 h-4 text-amber-500" />
+                <span>Rekomendacje & Dodatki w Koszyku (Upselling)</span>
+            </h3>
+
+            <div class="bg-[#0B0F19] p-4 rounded-xl border border-slate-800 flex justify-between items-center">
+                <div>
+                    <span class="block text-xs font-bold text-slate-200 uppercase tracking-wide">Pasek „Często zamawiane razem”</span>
+                    <span class="text-[10px] text-slate-400">Automatycznie sugeruje w koszyku szybkie dodanie sosów i napojów 1-kliknięciem</span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input 
+                        type="checkbox" 
+                        v-model="form.upsell_enabled" 
+                        class="sr-only peer"
+                    >
+                    <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                </label>
             </div>
         </div>
 

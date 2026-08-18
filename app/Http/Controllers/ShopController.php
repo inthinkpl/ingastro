@@ -23,16 +23,18 @@ class ShopController extends Controller
             'minAmount' => (float) SystemSetting::get('free_delivery_min_amount', 60.00),
         ];
 
+        $upsellSettings = [
+            'enabled'   => filter_var(SystemSetting::get('upsell_enabled', '1'), FILTER_VALIDATE_BOOLEAN),
+        ];
+
         return Inertia::render('Shop/Index', [
             'products'             => $products,
             'minOrderAmount'       => $minOrderAmount,
             'freeDeliverySettings' => $freeDeliverySettings,
+            'upsellSettings'       => $upsellSettings,
         ]);
     }
 
-    /**
-     * Wyświetla publiczną stronę śledzenia statusu zamówienia na żywo.
-     */
     public function orderStatus(string $token)
     {
         $order = \App\Models\Order::with([
@@ -66,11 +68,16 @@ class ShopController extends Controller
             'minAmount' => (float) SystemSetting::get('free_delivery_min_amount', 60.00),
         ];
 
-        return Inertia::render('Shop/Menu', [
+        $upsellSettings = [
+            'enabled'   => filter_var(SystemSetting::get('upsell_enabled', '1'), FILTER_VALIDATE_BOOLEAN),
+        ];
+
+        return Inertia::render('Shop/Menu.vue', [
             'products'             => $products,
             'ingredients'          => $ingredients,
             'minOrderAmount'       => $minOrderAmount,
             'freeDeliverySettings' => $freeDeliverySettings,
+            'upsellSettings'       => $upsellSettings,
         ]);
     }
 }

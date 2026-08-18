@@ -18,6 +18,7 @@ const props = defineProps({
     minOrderAmount: { type: [Number, String], default: 40.00 },
     freeDeliveryEnabled: { type: Boolean, default: false },
     freeDeliveryMinAmount: { type: [Number, String], default: 60.00 },
+    upsellEnabled: { type: Boolean, default: true },
     currentGateway: { type: String, default: 'simulation' },
     payuEnv: { type: String, default: 'sandbox' },
     payuPosId: { type: String, default: '' },
@@ -125,6 +126,7 @@ onMounted(() => {
                     :min-order-amount="minOrderAmount"
                     :free-delivery-enabled="freeDeliveryEnabled"
                     :free-delivery-min-amount="freeDeliveryMinAmount"
+                    :upsell-enabled="upsellEnabled"
                     :current-gateway="currentGateway"
                     :payu-env="payuEnv"
                     :payu-pos-id="payuPosId"
