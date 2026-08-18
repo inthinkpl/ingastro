@@ -35,6 +35,9 @@ class SettingsController extends Controller
             // 🥤 Ustawienia sugestii w koszyku (Upselling / Cross-selling)
             'upsellEnabled'         => filter_var(SystemSetting::get('upsell_enabled', '1'), FILTER_VALIDATE_BOOLEAN),
 
+            // 🍕 Ustawienia modułu Pizzy Pół na Pół
+            'halfHalfEnabled'       => filter_var(SystemSetting::get('half_half_enabled', '1'), FILTER_VALIDATE_BOOLEAN),
+
             'currentGateway'        => SystemSetting::get('payment_gateway', 'simulation'),
             'payuEnv'               => SystemSetting::get('payu_env', 'sandbox'),
             'payuPosId'             => SystemSetting::get('payu_pos_id', ''),
@@ -69,6 +72,9 @@ class SettingsController extends Controller
 
             // 🥤 Walidacja przełącznika Upsellingu
             'upsell_enabled'           => 'required|boolean',
+
+            // 🍕 Walidacja przełącznika Pizzy Pół na Pół
+            'half_half_enabled'        => 'required|boolean',
             
             // Reguła required_if gwarantuje, że jeśli wybrano bramkę 'payu', poniższe pola są obowiązkowe
             'payu_pos_id'              => 'nullable|required_if:payment_gateway,payu|string|max:100',

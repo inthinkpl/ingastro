@@ -1,6 +1,6 @@
 <script setup>
 import { useForm } from '@inertiajs/vue3';
-import { Save, Loader2, Truck, Sparkles } from 'lucide-vue-next';
+import { Save, Loader2, Truck, Sparkles, Pizza } from 'lucide-vue-next';
 
 const props = defineProps({
     restaurantName: { type: String, default: '' },
@@ -10,6 +10,7 @@ const props = defineProps({
     freeDeliveryEnabled: { type: Boolean, default: false },
     freeDeliveryMinAmount: { type: [Number, String], default: 60.00 },
     upsellEnabled: { type: Boolean, default: true },
+    halfHalfEnabled: { type: Boolean, default: true },
     currentGateway: { type: String, default: 'simulation' },
     payuEnv: { type: String, default: 'sandbox' },
     payuPosId: { type: String, default: '' },
@@ -26,6 +27,7 @@ const form = useForm({
     free_delivery_enabled: props.freeDeliveryEnabled,
     free_delivery_min_amount: props.freeDeliveryMinAmount,
     upsell_enabled: props.upsellEnabled,
+    half_half_enabled: props.halfHalfEnabled,
     payment_gateway: props.currentGateway,
     payu_env: props.payuEnv,
     payu_pos_id: props.payuPosId,
@@ -143,6 +145,29 @@ const submit = () => {
                         />
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- SEKCJA PIZZY PÓŁ NA PÓŁ -->
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+            <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wide border-b border-slate-800 pb-3 flex items-center space-x-2">
+                <Pizza class="w-4 h-4 text-amber-500" />
+                <span>Konfigurator Pizzy Pół na Pół</span>
+            </h3>
+
+            <div class="bg-[#0B0F19] p-4 rounded-xl border border-slate-800 flex justify-between items-center">
+                <div>
+                    <span class="block text-xs font-bold text-slate-200 uppercase tracking-wide">Moduł Pizzy Pół na Pół</span>
+                    <span class="text-[10px] text-slate-400">Udostępnia klientom możliwość komponowania pizzy z dwóch osobnych połówek na banerze oraz w menu</span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input 
+                        type="checkbox" 
+                        v-model="form.half_half_enabled" 
+                        class="sr-only peer"
+                    >
+                    <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                </label>
             </div>
         </div>
 
