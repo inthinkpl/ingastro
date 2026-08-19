@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Head } from '@inertiajs/vue3';
-import { Pizza } from 'lucide-vue-next';
+import { Pizza, MapPin } from 'lucide-vue-next';
 import { useCart } from '@/Composables/useCart';
 
 // Komponenty sklepowe z resources/js/Components/Shop/
@@ -41,7 +41,7 @@ const filteredProducts = computed(() => {
 
 const filterProducts = (cat) => {
     activeCategoryFilter.value = cat;
-    scrollToSection('products-grid');
+   
 };
 
 const handleVariantSelect = (product, variant) => {
@@ -81,18 +81,22 @@ const scrollToSection = (id) => {
             <!-- HERO -->
             <HeroSection @scroll-to-menu="scrollToSection('menu')" />
 
-            <!-- LOKALE BADGE -->
-            <section class="relative z-20 -mt-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- LOKALE BADGE (ODŚWIEŻONE KAFELKI Z IKONAMI SVG) -->
+            <section class="relative z-20 -mt-14 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="grid md:grid-cols-2 gap-4">
-                    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-2xl backdrop-blur-md flex items-center space-x-4">
-                        <div class="bg-red-500/10 p-3.5 rounded-xl text-red-500 flex-shrink-0">📍</div>
+                    <div class="bg-slate-900/95 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 shadow-2xl backdrop-blur-md flex items-center space-x-4 transition">
+                        <div class="bg-red-500/10 border border-red-500/20 p-3.5 rounded-xl text-red-500 shrink-0">
+                            <MapPin class="w-6 h-6" />
+                        </div>
                         <div>
                             <h3 class="text-white font-bold text-base md:text-lg">Pizzeria Savona Legionowa</h3>
                             <p class="text-slate-400 text-xs md:text-sm mt-0.5">ul. Legionowa 9/1, 15-369 Białystok</p>
                         </div>
                     </div>
-                    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-2xl backdrop-blur-md flex items-center space-x-4">
-                        <div class="bg-amber-500/10 p-3.5 rounded-xl text-amber-500 flex-shrink-0">📍</div>
+                    <div class="bg-slate-900/95 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 shadow-2xl backdrop-blur-md flex items-center space-x-4 transition">
+                        <div class="bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-xl text-amber-400 shrink-0">
+                            <MapPin class="w-6 h-6" />
+                        </div>
                         <div>
                             <h3 class="text-white font-bold text-base md:text-lg">Pizzeria Primo Savona</h3>
                             <p class="text-slate-400 text-xs md:text-sm mt-0.5">Rynek Kościuszki 8/1, 15-426 Białystok</p>

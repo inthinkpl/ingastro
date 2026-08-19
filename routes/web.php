@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\DiscountCodeController;
 use App\Http\Controllers\Admin\RolePermissionController;
 use App\Http\Controllers\Admin\OrderAdminController;
+use App\Http\Controllers\Admin\WarehouseController;
 
 use App\Http\Controllers\Manager\ProductController;
 use App\Http\Controllers\Manager\DeliveryZoneController;
@@ -122,7 +123,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $warehouseValue = 0;
             try {
                 foreach (\App\Models\Ingredient::all() as $ing) {
-                    $stock = $ing->stock ?? $ing->amount ?? $ing->quantity ?? 0;
+                    $stock = $ing->stock_main ?? $ing->stock ?? $ing->amount ?? $ing->quantity ?? 0;
                     $price = $ing->price ?? $ing->purchase_price ?? $ing->cost ?? 0;
                     $warehouseValue += ($stock * $price);
                 }
@@ -175,13 +176,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/bom/save-variant-recipe', [BomController::class, 'saveVariantRecipe'])->name('bom.save-variant-recipe');
         });
         
-        // 📦 Gospodarka magazynowa surowców - Wymaga uprawnienia 'inventory.manage'
+        // 📦 Gospodarka magazynowa surowców & Przesunięcia MM - Wymaga uprawnienia 'inventory.manage'
         Route::middleware('permission:inventory.manage')->group(function () {
             Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory');
             Route::post('/inventory', [InventoryController::class, 'store'])->name('inventory.store');
             Route::put('/inventory/{ingredient}', [InventoryController::class, 'update'])->name('inventory.update');
             Route::delete('/inventory/{ingredient}', [InventoryController::class, 'destroy'])->name('inventory.destroy');
             Route::post('/inventory/{ingredient}/restock', [InventoryController::class, 'restock'])->name('restock');
+
+            // 🏢 System Dwumagazynowy i Przesunięcia MM
+            Route::get('/warehouse', [WarehouseController::class, 'index'])->name('warehouse.index');
+            Route::post('/warehouse/transfer', [WarehouseController::class, 'transfer'])->name('warehouse.transfer');
         });
 
         // 💵 Rozliczanie gotówki kurierów - Wymaga uprawnienia 'reconciliation.view'
