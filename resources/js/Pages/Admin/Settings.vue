@@ -16,6 +16,7 @@ const props = defineProps({
     restaurantPhone: { type: String, default: '' },
     restaurantAddress: { type: String, default: '' },
     minOrderAmount: { type: [Number, String], default: 40.00 },
+    isEcommerceActive: { type: Boolean, default: true },
     freeDeliveryEnabled: { type: Boolean, default: false },
     freeDeliveryMinAmount: { type: [Number, String], default: 60.00 },
     upsellEnabled: { type: Boolean, default: true },
@@ -57,7 +58,7 @@ onMounted(() => {
             <!-- NAGŁÓWEK -->
             <header class="border-b border-slate-800 pb-4">
                 <h1 class="text-xl font-black text-amber-500 uppercase tracking-wider">Ustawienia Globalne Systemu</h1>
-                <p class="text-xs text-slate-400 mt-0.5">Centrum konfiguracji parametrów pizzerii, promocji, powiadomień, płatności i uprawnień.</p>
+                <p class="text-xs text-slate-400 mt-0.5">Centrum konfiguracji parametrów pizzerii, e-commerce, promocji, powiadomień, płatności i uprawnień.</p>
             </header>
 
             <!-- PASEK ZAKŁADEK -->
@@ -124,6 +125,7 @@ onMounted(() => {
                     :restaurant-phone="restaurantPhone"
                     :restaurant-address="restaurantAddress"
                     :min-order-amount="minOrderAmount"
+                    :is-ecommerce-active="isEcommerceActive"
                     :free-delivery-enabled="freeDeliveryEnabled"
                     :free-delivery-min-amount="freeDeliveryMinAmount"
                     :upsell-enabled="upsellEnabled"

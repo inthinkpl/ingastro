@@ -4,7 +4,7 @@ import { Link, usePage, router } from '@inertiajs/vue3';
 import { 
     ShoppingCart, ChefHat, ShoppingBag, TrendingUp, Pizza, 
     Package, Users, Banknote, Map, Settings, LogOut, Clock,
-    Play, Pause, Square, ChevronDown, ChevronRight, UserCheck
+    Play, Pause, Square, ChevronDown, ChevronRight, UserCheck, Gift
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -223,6 +223,17 @@ const toggleTeamMenu = () => {
                     >
                         <Package class="w-4 h-4 text-amber-500 shrink-0" />
                         <span>Magazyn Surowców</span>
+                    </Link>
+
+                    <!-- PROGRAM LOJALNOŚCIOWY & CRM -->
+                    <Link 
+                        v-if="can('settings.discounts') || ['admin', 'manager'].includes(userRole)"
+                        :href="route('manager.loyalty.index')" 
+                        :class="route().current('manager.loyalty.*') ? 'bg-red-600 text-white font-bold border-red-500 shadow-lg shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
+                        class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider border transition-all"
+                    >
+                        <Gift class="w-4 h-4 text-amber-500 shrink-0" />
+                        <span>Program Lojalnościowy</span>
                     </Link>
 
                     <!-- ROZSUWANE SUBMENU: ZARZĄDZANIE ZESPOŁEM (Admin / Manager) -->

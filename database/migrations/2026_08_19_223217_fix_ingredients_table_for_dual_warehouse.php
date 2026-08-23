@@ -8,19 +8,24 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::table('ingredients', function (Blueprint $table) {
-            // Zmiana nazwy starej kolumny na stock_main
+            // Zmiana nazwy starej kolumny stanu na stock_main
             if (Schema::hasColumn('ingredients', 'stock_quantity')) {
                 $table->renameColumn('stock_quantity', 'stock_main');
             } elseif (Schema::hasColumn('ingredients', 'stock')) {
                 $table->renameColumn('stock', 'stock_main');
             }
 
-            // Dodanie kolumn dla Magazynu Lokalnego
+            // Dodanie kolumn dla Magazynu Lokalnego (kuchni)
             if (!Schema::hasColumn('ingredients', 'stock_local')) {
                 $table->decimal('stock_local', 10, 3)->default(0)->after('unit');
             }
             if (!Schema::hasColumn('ingredients', 'min_stock_local')) {
-                $table->decimal('min_stock_local', 10, 3)->default(5.000)->after('stock_local');
+                $table->decimal('min_stock_local', 10, 3)->default(0.000)->after('stock_local');
+            }
+
+            // Usunięcie starej, nieużywanej kolumny min_limit
+            if (Schema::hasColumn('ingredients', 'min_limit')) {
+                $table->dropColumn('min_limit');
             }
         });
     }
@@ -31,6 +36,10 @@ return new class extends Migration {
             if (Schema::hasColumn('ingredients', 'stock_main')) {
                 $table->renameColumn('stock_main', 'stock_quantity');
             }
+            if (!Schema::hasColumn('ingredients', 'min_limit')) {
+                $table->decimal('min_limit', 10, 2)->default(5.00);
+            }
+            
             $table->dropColumn(['stock_local', 'min_stock_local']);
         });
     }

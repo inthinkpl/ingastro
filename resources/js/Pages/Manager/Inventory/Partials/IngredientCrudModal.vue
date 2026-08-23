@@ -19,15 +19,14 @@ const form = useForm({
     purchase_price: 0
 });
 
-// Podczas zmiany edytowanego surowca przepisujemy dane do formularza
+// Przepisywanie danych edytowanego surowca do formularza
 watch(() => props.ingredient, (newVal) => {
     if (newVal) {
         form.name = newVal.name || '';
-        form.stock_main = newVal.stock_main ?? newVal.stock_quantity ?? newVal.stock ?? 0;
-        // Wczytujemy min_stock_local lub fallback min_limit
-        form.min_stock_local = newVal.min_stock_local ?? newVal.min_limit ?? 0;
+        form.stock_main = newVal.stock_main ?? 0;
+        form.min_stock_local = newVal.min_stock_local ?? 0;
         form.unit = newVal.unit || 'kg';
-        form.purchase_price = newVal.purchase_price ?? newVal.price ?? newVal.cost ?? 0;
+        form.purchase_price = newVal.purchase_price ?? 0;
     } else {
         form.reset();
     }

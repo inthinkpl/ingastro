@@ -47,19 +47,17 @@ class InventoryController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:ingredients,name',
             'stock_main' => 'nullable|numeric|min:0',
-            'stock_quantity' => 'nullable|numeric|min:0', // kompatybilność ze starym formularzem
             'stock_local' => 'nullable|numeric|min:0',
             'min_stock_local' => 'nullable|numeric|min:0',
-            'min_limit' => 'nullable|numeric|min:0',       // kompatybilność ze starym formularzem
             'unit' => 'required|string|max:10',
             'purchase_price' => 'required|numeric|min:0',
         ]);
 
         Ingredient::create([
             'name' => $validated['name'],
-            'stock_main' => $validated['stock_main'] ?? $validated['stock_quantity'] ?? 0,
+            'stock_main' => $validated['stock_main'] ?? 0,
             'stock_local' => $validated['stock_local'] ?? 0,
-            'min_stock_local' => $validated['min_stock_local'] ?? $validated['min_limit'] ?? 0, // Poprawiono: Domyślnie 0 zamiast 5
+            'min_stock_local' => $validated['min_stock_local'] ?? 0,
             'unit' => $validated['unit'],
             'purchase_price' => $validated['purchase_price'],
         ]);
@@ -70,23 +68,18 @@ class InventoryController extends Controller
     /**
      * Aktualizuje parametry surowca (U z cyklu CRUD).
      */
-public function update(Request $request, Ingredient $ingredient)
+    public function update(Request $request, Ingredient $ingredient)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:ingredients,name,' . $ingredient->id,
             'min_stock_local' => 'nullable|numeric|min:0',
-            'min_limit' => 'nullable|numeric|min:0',
             'unit' => 'required|string|max:10',
             'purchase_price' => 'required|numeric|min:0',
         ]);
 
-        // Pobieramy nową wartość minimum (z min_stock_local lub min_limit)
-        $newMinStock = $validated['min_stock_local'] ?? $validated['min_limit'] ?? 0;
-
         $ingredient->update([
             'name' => $validated['name'],
-            'min_stock_local' => $newMinStock,
-            'min_limit' => $newMinStock, // zapisujemy w obu miejscach dla bezpieczeństwa
+            'min_stock_local' => $validated['min_stock_local'] ?? 0,
             'unit' => $validated['unit'],
             'purchase_price' => $validated['purchase_price'],
         ]);

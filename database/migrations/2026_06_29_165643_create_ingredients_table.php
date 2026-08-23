@@ -11,10 +11,11 @@ return new class extends Migration
         Schema::create('ingredients', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique(); // np. Ser Mozzarella
-            $table->decimal('stock_quantity', 10, 2)->default(0.00); // aktualna ilość w magazynie
-            $table->string('unit'); // kg, l, szt
-            $table->decimal('purchase_price', 8, 2); // cena zakupu za jednostkę
-            $table->decimal('min_limit', 10, 2)->default(5.00); // minimum logistyczne
+            $table->decimal('stock_main', 10, 2)->default(0.00);      // Stan w Magazynie Głównym
+            $table->decimal('stock_local', 10, 2)->default(0.00);     // Stan w Magazynie Lokalnym (kuchnia)
+            $table->decimal('min_stock_local', 10, 2)->default(0.00); // Minimum logistyczne dla kuchni
+            $table->string('unit');                                   // kg, l, szt
+            $table->decimal('purchase_price', 8, 2);                  // Cena zakupu za jednostkę
             $table->timestamps();
         });
     }

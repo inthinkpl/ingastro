@@ -11,10 +11,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Rejestracja aliasów middleware dla ról i uprawnień
+        // Rejestracja aliasów middleware dla ról, uprawnień i modułów
         $middleware->alias([
-            'role'       => \App\Http\Middleware\RoleMiddleware::class,
-            'permission' => \App\Http\Middleware\CheckPermission::class, // 🔥 Nowy alias dla macierzy uprawnień
+            'role'             => \App\Http\Middleware\RoleMiddleware::class,
+            'permission'       => \App\Http\Middleware\CheckPermission::class,
+            'ecommerce.active' => \App\Http\Middleware\EnsureEcommerceIsActive::class, // Moduł wyłączania e-commerce
         ]);
 
         $middleware->web(append: [

@@ -10,6 +10,7 @@ use App\Actions\CreateOrderAction;
 use App\Events\OrderPlaced;
 use App\Events\OrderStatusUpdated;
 use App\Services\Payment\PaymentFactory;
+use App\Services\LoyaltyService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -104,7 +105,7 @@ class OrderController extends Controller
     /**
      * Aktualizacja statusu zamówienia przez kucharza na monitorze KDS.
      */
-    public function updateStatus(Request $request, Order $order)
+    public function updateStatus(Request $request, Order $order, LoyaltyService $loyaltyService)
     {
         $validated = $request->validate([
             'status' => 'required|in:nowe,w_przygotowaniu,gotowe,w drodze,dostarczone,wydane'
@@ -163,11 +164,21 @@ class OrderController extends Controller
             }
         }
 
+        // 🎁 AUTOMATYKA PROGRAMU LOJALNOŚCIOWEGO:
+        // Naliczenie punktów po zrealizowaniu zamówienia
+        if (in_array($newStatus, ['gotowe', 'dostarczone', 'wydane']) && !in_array($oldStatus, ['gotowe', 'dostarczone', 'wydane'])) {
+            try {
+                $loyaltyService->addPointsForOrder($order);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Błąd naliczania punktów lojalnościowych dla zamówienia #{$order->id}: " . $e->getMessage());
+            }
+        }
+
         if (class_exists('\App\Events\OrderPlaced')) {
             broadcast(new OrderPlaced($order))->toOthers();
         }
 
-        return redirect()->back()->with('success', "Status zmieniony. Surowce rozliczone w Magazynie Lokalnym.");
+        return redirect()->back()->with('success', "Status zaktualizowany.");
     }
 
     /**

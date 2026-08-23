@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Events\OrderStatusUpdated; // <-- Ddodany import zdarzenia WebSockets/Push
+use App\Events\OrderStatusUpdated;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\Delivery\RouteOptimizationService;
@@ -12,20 +12,20 @@ use Inertia\Inertia;
 class DriverDeliveryController extends Controller
 {
     /**
-     * Wyświetla aktywną trasę kierowcy (zamówienia oczekujące w kuchni + zamówienia w trasie).
+     * Wyświetla aktywną trasę kierowcy oraz wszystkie zamówienia z dostawą.
      */
     public function index()
     {
         $user = auth()->user();
 
+        // Pobieramy wszystkie aktywne zamówienia w procesie dostawy
         $query = Order::with('deliveryZone')
             ->where('type', 'dostawa')
-            ->whereIn('status', ['gotowe', 'w_dostawie']);
+            ->whereIn('status', ['nowe', 'w_przygotowaniu', 'gotowe', 'w_dostawie']);
 
-        // Jeśli zalogowany jest Menedżer lub Admin (testy), widzi WSZYSTKIE aktywne dostawy w lokalu.
-        // Jeśli zwykły Kierowca, widzi zamówienia przypisane do siebie LUB jeszcze nieprzypisane do kogoś innego.
+        // Menedżer widzi wszystkie dostawy; Kierowca widzi przypisane do siebie lub jeszcze nieprzypisane
         if ($user->role === 'driver') {
-            $query->where(function($q) use ($user) {
+            $query->where(function ($q) use ($user) {
                 $q->where('driver_id', $user->id)
                   ->orWhereNull('driver_id');
             });
@@ -45,30 +45,29 @@ class DriverDeliveryController extends Controller
     }
 
     /**
-     * KIEROWCA KLIKA: "Odebrałem z kuchni"
-     * Zmienia status z 'gotowe' na 'w_dostawie' -> Pizza znika z KDS kuchni!
+     * Odbiór paczki z pizzerii / rozpoczęcie kursu.
      */
     public function pickupOrder(Order $order)
     {
+        $driverId = $order->driver_id ?? auth()->id();
+
         $order->update([
             'status'    => 'w_dostawie',
-            'driver_id' => $order->driver_id ?? auth()->id(), // Przypisuje zalogowanego kierowcę jeśli nie było przypisania
+            'driver_id' => $driverId,
         ]);
 
-        // Przeliczamy optymalną trasę po pobraniu nowej paczki
-        if ($order->driver_id) {
+        if ($driverId) {
             $routeService = new RouteOptimizationService();
-            $routeService->optimizeDriverRoute($order->driver_id);
+            $routeService->optimizeDriverRoute($driverId);
         }
 
         event(new OrderStatusUpdated($order));
 
-        return redirect()->back()->with('success', 'Odebrano pizzę z kuchni. Status zmieniony na: W dostawie.');
+        return redirect()->back()->with('success', "Zamówienie #{$order->id} odebrane z kuchni.");
     }
 
     /**
-     * KIEROWCA KLIKA: "Dostarczono do klienta"
-     * Finalizacja i rozliczenie zamówienia.
+     * Oznaczenie zamówienia jako dostarczone do klienta.
      */
     public function completeOrder(Order $order)
     {
@@ -81,14 +80,14 @@ class DriverDeliveryController extends Controller
             $routeService = new RouteOptimizationService();
             $routeService->optimizeDriverRoute($order->driver_id);
         }
-        
+
         event(new OrderStatusUpdated($order));
 
-        return redirect()->back()->with('success', 'Zamówienie dostarczone do klienta.');
+        return redirect()->back()->with('success', "Zamówienie #{$order->id} zostało pomyślnie dostarczone.");
     }
 
     /**
-     * MENEDŻER: Ręczne przypisanie lub zmiana kierowcy dla danego zamówienia.
+     * Ręczne przypisanie kierowcy przez Menedżera.
      */
     public function assignDriver(Request $request, Order $order)
     {
@@ -100,35 +99,34 @@ class DriverDeliveryController extends Controller
             'driver_id' => $validated['driver_id']
         ]);
 
-        // Przeliczamy ciąg tras dla nowego kierowcy
         $routeService = new RouteOptimizationService();
         $routeService->optimizeDriverRoute($validated['driver_id']);
 
-        event(new OrderStatusUpdated($order)); // Powiadomienie na żywo o przypisaniu kierowcy
+        event(new OrderStatusUpdated($order));
 
-        return redirect()->back()->with('success', "Zamówienie #{$order->id} zostało przypisane do nowego kierowcy.");
+        return redirect()->back()->with('success', "Zamówienie #{$order->id} zostało przypisane do kierowcy.");
     }
 
     /**
-     * MENEDŻER: Widok rozliczania gotówki kierowców (/manager/reconciliation)
+     * Widok rozliczenia kasetki gotówkowej u Menedżera.
      */
     public function managerIndex()
     {
         $drivers = User::where('role', 'driver')
-            ->with(['orders' => function($q) {
+            ->with(['orders' => function ($q) {
                 $q->where('type', 'dostawa')
                   ->where('status', 'dostarczone')
                   ->where('payment_method', 'gotówka')
                   ->where('payment_status', 'opłacone');
             }])
             ->get()
-            ->map(function($driver) {
+            ->map(function ($driver) {
                 $cashAmount = $driver->orders->sum('total_price');
                 return [
                     'id'             => $driver->id,
                     'name'           => $driver->name,
                     'email'          => $driver->email,
-                    'unsettled_cash' => (float)$cashAmount,
+                    'unsettled_cash' => (float) $cashAmount,
                     'orders_count'   => $driver->orders->count(),
                 ];
             });
@@ -139,7 +137,7 @@ class DriverDeliveryController extends Controller
     }
 
     /**
-     * MENEDŻER: Rozliczenie (zerowanie kasetki) pobranej gotówki od kierowcy
+     * Zerowanie stanu kasetki kierowcy.
      */
     public function settleDriver(User $driver)
     {
@@ -149,6 +147,6 @@ class DriverDeliveryController extends Controller
             ->where('payment_method', 'gotówka')
             ->update(['payment_status' => 'rozliczone_menedżer']);
 
-        return redirect()->back()->with('success', "Gotówka kierowcy {$driver->name} została rozliczona w kasetce.");
+        return redirect()->back()->with('success', "Gotówka kierowcy {$driver->name} została rozliczona.");
     }
 }

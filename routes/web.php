@@ -8,6 +8,7 @@ use App\Http\Controllers\ShopController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\DiscountController;
+use App\Http\Controllers\Shop\LoyaltyShopController;
 
 // IMPORTY KONTROLERÓW PANELU ERP
 use App\Http\Controllers\Admin\SettingsController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\Admin\WarehouseController;
 
 use App\Http\Controllers\Manager\ProductController;
 use App\Http\Controllers\Manager\DeliveryZoneController;
+use App\Http\Controllers\Manager\LoyaltyAdminController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\DriverDeliveryController;
 use App\Http\Controllers\PushSubscriptionController;
@@ -27,25 +29,35 @@ use App\Http\Controllers\BomController;
 
 /*
 |--------------------------------------------------------------------------
-| 1. STRONA PUBLICZNA SKLEPU & FINANSE
+| 1. STRONA PUBLICZNA SKLEPU & FINANSE (ZABEZPIECZONE MODUŁEM E-COMMERCE)
 |--------------------------------------------------------------------------
 */
 Route::post('/push/subscribe', [PushSubscriptionController::class, 'subscribe'])->name('push.subscribe');
-Route::get('/', [ShopController::class, 'index'])->name('shop.index');
-Route::get('/menu', [ShopController::class, 'menu'])->name('shop.menu');
-Route::post('/order/store', [OrderController::class, 'store'])->name('order.store');
 
-Route::prefix('payment')->group(function () {
-    Route::get('/process/{order}', [PaymentController::class, 'process'])->name('payment.process');
-    Route::get('/simulation/{order}', [PaymentController::class, 'simulationView'])->name('payment.simulation.view');
-    Route::post('/simulation/{order}/confirm', [PaymentController::class, 'simulationConfirm'])->name('payment.simulation.confirm');
-    
-    // Zunifikowany produkcyjny Webhook (Dla PayU, Tpay oraz automatyzacji procesów w tle)
-    Route::post('/webhook', [PaymentController::class, 'webhook'])->name('payment.webhook');
-    Route::post('/payu/webhook', [\App\Services\Payment\drivers\PayUDriver::class, 'verify'])->name('payment.payu.webhook');
-    
-    Route::get('/order/status/{token}', [ShopController::class, 'orderStatus'])->name('order.status');
-    Route::post('/discount/validate', [DiscountController::class, 'validateCode'])->name('discount.validate');
+Route::middleware(['ecommerce.active'])->group(function () {
+    Route::get('/', [ShopController::class, 'index'])->name('shop.index');
+    Route::get('/menu', [ShopController::class, 'menu'])->name('shop.menu');
+    Route::post('/order/store', [OrderController::class, 'store'])->name('order.store');
+
+    // 🎁 PUBLICZNE TRASY PROGRAMU LOJALNOŚCIOWEGO (WERYFIKACJA W KOSZYKU)
+    Route::prefix('loyalty')->name('loyalty.')->group(function () {
+        Route::post('/check-points', [LoyaltyShopController::class, 'checkPoints'])->name('check');
+        Route::post('/send-otp', [LoyaltyShopController::class, 'sendOtp'])->name('send-otp');
+        Route::post('/verify-otp', [LoyaltyShopController::class, 'verifyOtp'])->name('verify-otp');
+    });
+
+    Route::prefix('payment')->group(function () {
+        Route::get('/process/{order}', [PaymentController::class, 'process'])->name('payment.process');
+        Route::get('/simulation/{order}', [PaymentController::class, 'simulationView'])->name('payment.simulation.view');
+        Route::post('/simulation/{order}/confirm', [PaymentController::class, 'simulationConfirm'])->name('payment.simulation.confirm');
+        
+        // Zunifikowany produkcyjny Webhook (Dla PayU, Tpay oraz automatyzacji procesów w tle)
+        Route::post('/webhook', [PaymentController::class, 'webhook'])->name('payment.webhook');
+        Route::post('/payu/webhook', [\App\Services\Payment\drivers\PayUDriver::class, 'verify'])->name('payment.payu.webhook');
+        
+        Route::get('/order/status/{token}', [ShopController::class, 'orderStatus'])->name('order.status');
+        Route::post('/discount/validate', [DiscountController::class, 'validateCode'])->name('discount.validate');
+    });
 });
 
 /*
@@ -108,7 +120,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
      */
     Route::middleware(['role:manager,admin'])->prefix('manager')->name('manager.')->group(function () {
         
-        // 📊 Dashboard BI (Dostępny dla managera z urzędu)
+        // 📊 Dashboard BI
         Route::get('/dashboard', function () { 
             $totalRevenue = 0;
             try {
@@ -160,23 +172,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ]); 
         })->name('dashboard');
         
-        // 🍕 Kreator produktów karty dań (CRUD) - Wymaga uprawnienia 'products.manage'
+        // 🍕 Kreator produktów karty dań (CRUD)
         Route::middleware('permission:products.manage')->group(function () {
             Route::get('/products', [ProductController::class, 'index'])->name('products.index');
             Route::post('/products', [ProductController::class, 'store'])->name('products.store');
             Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
             Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
             
-            // Warianty rozmiarowe (Szybkie dodawanie i usuwanie z poziomu modalu BOM)
             Route::post('/products/{product}/variants', [ProductController::class, 'storeVariant'])->name('products.variants.store');
             Route::delete('/products/variants/{variant}', [ProductController::class, 'destroyVariant'])->name('products.variants.destroy');
             
-            // Receptury BOM per wariant
             Route::post('/products/variants/{variant}/recipe', [ProductController::class, 'saveRecipe'])->name('products.save_recipe');
             Route::post('/bom/save-variant-recipe', [BomController::class, 'saveVariantRecipe'])->name('bom.save-variant-recipe');
         });
         
-        // 📦 Gospodarka magazynowa surowców & Przesunięcia MM - Wymaga uprawnienia 'inventory.manage'
+        // 📦 Gospodarka magazynowa surowców & Przesunięcia MM
         Route::middleware('permission:inventory.manage')->group(function () {
             Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory');
             Route::post('/inventory', [InventoryController::class, 'store'])->name('inventory.store');
@@ -184,18 +194,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::delete('/inventory/{ingredient}', [InventoryController::class, 'destroy'])->name('inventory.destroy');
             Route::post('/inventory/{ingredient}/restock', [InventoryController::class, 'restock'])->name('restock');
 
-            // 🏢 System Dwumagazynowy i Przesunięcia MM
             Route::get('/warehouse', [WarehouseController::class, 'index'])->name('warehouse.index');
             Route::post('/warehouse/transfer', [WarehouseController::class, 'transfer'])->name('warehouse.transfer');
         });
 
-        // 💵 Rozliczanie gotówki kurierów - Wymaga uprawnienia 'reconciliation.view'
+        // 🎁 Program Lojalnościowy i CRM Klientów
+        Route::middleware('permission:settings.discounts')->group(function () {
+            Route::get('/loyalty', [LoyaltyAdminController::class, 'index'])->name('loyalty.index');
+            Route::put('/loyalty/settings', [LoyaltyAdminController::class, 'updateSettings'])->name('loyalty.settings.update');
+            Route::post('/loyalty/customers/{customer}/adjust', [LoyaltyAdminController::class, 'adjustPoints'])->name('loyalty.adjust');
+        });
+
+        // 💵 Rozliczanie gotówki kurierów
         Route::middleware('permission:reconciliation.view')->group(function () {
             Route::get('/reconciliation', [DriverDeliveryController::class, 'managerIndex'])->name('reconciliation.index');
             Route::post('/reconciliation/settle/{driver}', [DriverDeliveryController::class, 'settleDriver'])->name('reconciliation.settle');
         });
 
-        // 🗺️ Zarządzanie strefami dostaw - Wymaga uprawnienia 'delivery_zones.manage'
+        // 🗺️ Zarządzanie strefami dostaw
         Route::middleware('permission:delivery_zones.manage')->group(function () {
             Route::get('/delivery-zones', [DeliveryZoneController::class, 'index'])->name('delivery_zones.index');
             Route::post('/delivery-zones', [DeliveryZoneController::class, 'store'])->name('delivery_zones.store');
@@ -203,7 +219,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::delete('/delivery-zones/{deliveryZone}', [DeliveryZoneController::class, 'destroy'])->name('delivery_zones.destroy');
         });
 
-        // Ręczne przypisywanie kierowcy przez menedżera
         Route::post('/orders/{order}/assign-driver', [DriverDeliveryController::class, 'assignDriver'])->name('orders.assign_driver');
     });
 

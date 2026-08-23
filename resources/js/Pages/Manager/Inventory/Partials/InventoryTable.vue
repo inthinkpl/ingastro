@@ -76,7 +76,7 @@ const filteredIngredients = computed(() => {
                         
                         <!-- Stan: Magazyn Główny -->
                         <td class="p-3 text-right font-mono font-bold text-amber-400">
-                            {{ Number(item.stock_main ?? item.stock_quantity ?? item.stock ?? 0).toFixed(3) }} {{ item.unit }}
+                            {{ Number(item.stock_main ?? 0).toFixed(3) }} {{ item.unit }}
                         </td>
                         
                         <td class="p-3 text-center text-slate-600">
@@ -84,11 +84,11 @@ const filteredIngredients = computed(() => {
                         </td>
 
                         <!-- Stan: Magazyn Lokalny (Sprawdzanie stanu vs min_stock_local) -->
-                        <td class="p-3 text-right font-mono font-bold" :class="Number(item.stock_local ?? 0) <= Number(item.min_stock_local ?? item.min_limit ?? 0) ? 'text-red-400' : 'text-emerald-400'">
+                        <td class="p-3 text-right font-mono font-bold" :class="Number(item.stock_local ?? 0) <= Number(item.min_stock_local ?? 0) ? 'text-red-400' : 'text-emerald-400'">
                             {{ Number(item.stock_local ?? 0).toFixed(3) }} {{ item.unit }}
                             
                             <span 
-                                v-if="Number(item.stock_local ?? 0) <= Number(item.min_stock_local ?? item.min_limit ?? 0)" 
+                                v-if="Number(item.stock_local ?? 0) <= Number(item.min_stock_local ?? 0)" 
                                 class="flex items-center justify-end space-x-1 text-[9px] text-red-500 font-sans uppercase font-bold mt-0.5"
                             >
                                 <AlertTriangle class="w-3 h-3" />
@@ -96,9 +96,9 @@ const filteredIngredients = computed(() => {
                             </span>
                         </td>
 
-                        <!-- Cena Zakupu (Poprawione mapowanie na purchase_price) -->
+                        <!-- Cena Zakupu -->
                         <td class="p-3 text-right font-mono text-slate-400">
-                            {{ Number(item.purchase_price ?? item.price ?? item.cost ?? 0).toFixed(2) }} zł
+                            {{ Number(item.purchase_price ?? 0).toFixed(2) }} zł
                         </td>
 
                         <!-- Akcje -->

@@ -28,6 +28,9 @@ class SettingsController extends Controller
             'restaurantAddress'     => SystemSetting::get('restaurant_address', ''),
             'minOrderAmount'        => (float) SystemSetting::get('min_order_amount', 40.00),
             
+            // 🛒 Przełącznik sklepu E-commerce
+            'isEcommerceActive'     => filter_var(SystemSetting::get('is_ecommerce_active', '1'), FILTER_VALIDATE_BOOLEAN),
+
             // 🚚 Ustawienia darmowej dostawy
             'freeDeliveryEnabled'   => filter_var(SystemSetting::get('free_delivery_enabled', '0'), FILTER_VALIDATE_BOOLEAN),
             'freeDeliveryMinAmount' => (float) SystemSetting::get('free_delivery_min_amount', 60.00),
@@ -66,6 +69,9 @@ class SettingsController extends Controller
             'payu_env'                 => 'required|string|in:sandbox,production',
             'min_order_amount'         => 'required|numeric|min:0',
 
+            // 🛒 Walidacja stanu sklepu E-commerce
+            'is_ecommerce_active'      => 'required|boolean',
+
             // 🚚 Walidacja pól darmowej dostawy
             'free_delivery_enabled'    => 'required|boolean',
             'free_delivery_min_amount' => 'required|numeric|min:0',
@@ -91,7 +97,6 @@ class SettingsController extends Controller
             );
         }
 
-        // Powrót do formularza z komunikatem sukcesu w sesji Flash
         return redirect()->back()->with('success', 'Wszystkie parametry systemowe, finansowe i rekomendacji zostały poprawnie zabezpieczone.');
     }
 

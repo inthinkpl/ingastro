@@ -26,10 +26,11 @@ class DashboardController extends Controller
             ->pluck('count', 'type')
             ->toArray();
 
-        // 4. Finansowa wycena aktualnego magazynu (stan * cena zakupu)
+        // 4. Finansowa wycena aktualnego magazynu (suma stanu głównego i lokalnego * cena zakupu)
         $ingredients = Ingredient::all();
         $warehouseValue = $ingredients->reduce(function ($carry, $ingredient) {
-            return $carry + ($ingredient->stock_quantity * $ingredient->purchase_price);
+            $totalStock = ($ingredient->stock_main ?? 0) + ($ingredient->stock_local ?? 0);
+            return $carry + ($totalStock * ($ingredient->purchase_price ?? 0));
         }, 0);
 
         // 5. TOP 5 najlepiej sprzedających się wariantów produktów
@@ -44,7 +45,7 @@ class DashboardController extends Controller
                     'name' => ($item->variant && $item->variant->product) 
                         ? $item->variant->product->name . ' (' . $item->variant->size_name . ')' 
                         : 'Produkt usunięty',
-                    'qty' => $item->total_qty
+                    'qty' => (int) $item->total_qty
                 ];
             });
 
