@@ -1,6 +1,6 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
-import { ArrowUpDown, Eye, Car, Store } from 'lucide-vue-next';
+import { ArrowUpDown, Eye, Car, Store, Phone } from 'lucide-vue-next';
 
 const props = defineProps({
     orders: Object,
@@ -51,6 +51,7 @@ const getStatusBadge = (status) => {
                             </div>
                         </th>
                         <th class="p-4">Typ & Adres</th>
+                        <th class="p-4">Telefon</th>
                         <th class="p-4">Płatność</th>
                         <th class="p-4">Status Zamówienia</th>
                         <th @click="$emit('toggle-sort', 'total_price')" class="p-4 cursor-pointer hover:text-white transition">
@@ -83,6 +84,19 @@ const getStatusBadge = (status) => {
                             </p>
                         </td>
 
+                        <!-- NOWA KOLUMNA: NUMER TELEFONU -->
+                        <td class="p-4 whitespace-nowrap">
+                            <a 
+                                v-if="order.customer_phone || order.phone || order.user?.phone"
+                                :href="`tel:${order.customer_phone || order.phone || order.user?.phone}`" 
+                                class="inline-flex items-center space-x-1.5 font-mono font-bold text-slate-200 hover:text-amber-400 transition"
+                            >
+                                <Phone class="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                <span>{{ order.customer_phone || order.phone || order.user?.phone }}</span>
+                            </a>
+                            <span v-else class="text-slate-600 italic">—</span>
+                        </td>
+
                         <td class="p-4 space-y-0.5">
                             <span class="uppercase font-mono font-bold text-slate-200 block">{{ order.payment_method }}</span>
                             <span :class="order.payment_status === 'opłacone' ? 'text-emerald-400' : 'text-amber-400'" class="text-[10px] font-bold">
@@ -110,7 +124,7 @@ const getStatusBadge = (status) => {
                     </tr>
 
                     <tr v-if="orders.data.length === 0">
-                        <td colspan="7" class="p-8 text-center text-slate-500 italic">
+                        <td colspan="8" class="p-8 text-center text-slate-500 italic">
                             Brak zamówień spełniających wybrane kryteria wyszukiwania.
                         </td>
                     </tr>

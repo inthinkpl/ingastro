@@ -2,6 +2,9 @@
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use Illuminate\Http\Request;
+use App\Services\PromotionService;
+use App\Models\Promotion;
 
 // IMPORTY KONTROLERÓW GLOBALNYCH
 use App\Http\Controllers\ShopController;
@@ -26,6 +29,7 @@ use App\Http\Controllers\DriverDeliveryController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\RcpController; 
 use App\Http\Controllers\BomController;
+use App\Http\Controllers\Manager\PromotionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -39,6 +43,17 @@ Route::middleware(['ecommerce.active'])->group(function () {
     Route::get('/menu', [ShopController::class, 'menu'])->name('shop.menu');
     Route::post('/order/store', [OrderController::class, 'store'])->name('order.store');
 
+    // 🏷️ AUTOMATYCZNE PROMOCJE W KOSZYKU E-COMMERCE
+    Route::get('/promotions', function () {
+        return response()->json(Promotion::where('is_active', true)->with('rewardVariant.product')->get());
+    })->name('promotions.public');
+
+    Route::post('/promotions/calculate', function (Request $request, PromotionService $promotionService) {
+        $cartItems = $request->input('items', []);
+        $result = $promotionService->calculatePromotions($cartItems);
+        return response()->json($result);
+    })->name('promotions.calculate');
+
     // 🎁 PUBLICZNE TRASY PROGRAMU LOJALNOŚCIOWEGO (WERYFIKACJA W KOSZYKU)
     Route::prefix('loyalty')->name('loyalty.')->group(function () {
         Route::post('/check-points', [LoyaltyShopController::class, 'checkPoints'])->name('check');
@@ -50,11 +65,11 @@ Route::middleware(['ecommerce.active'])->group(function () {
         Route::get('/process/{order}', [PaymentController::class, 'process'])->name('payment.process');
         Route::get('/simulation/{order}', [PaymentController::class, 'simulationView'])->name('payment.simulation.view');
         Route::post('/simulation/{order}/confirm', [PaymentController::class, 'simulationConfirm'])->name('payment.simulation.confirm');
-        
+
         // Zunifikowany produkcyjny Webhook (Dla PayU, Tpay oraz automatyzacji procesów w tle)
         Route::post('/webhook', [PaymentController::class, 'webhook'])->name('payment.webhook');
         Route::post('/payu/webhook', [\App\Services\Payment\drivers\PayUDriver::class, 'verify'])->name('payment.payu.webhook');
-        
+
         Route::get('/order/status/{token}', [ShopController::class, 'orderStatus'])->name('order.status');
         Route::post('/discount/validate', [DiscountController::class, 'validateCode'])->name('discount.validate');
     });
@@ -66,7 +81,7 @@ Route::middleware(['ecommerce.active'])->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'verified'])->group(function () {
-    
+
     Route::get('/dashboard', function () { return Inertia::render('Dashboard'); })->name('dashboard');
 
     /*
@@ -85,7 +100,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::middleware(['role:admin,manager'])->prefix('admin')->name('admin.')->group(function () {
-        
+
         // ⏱️ Rejestracja Czasu Pracy (RCP) - Panel Ewidencji i Korekt
         Route::get('/rcp', [RcpController::class, 'index'])->name('rcp.index');
         Route::post('/rcp', [RcpController::class, 'store'])->name('rcp.store');
@@ -95,7 +110,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.edit');
         Route::post('/settings', [SettingsController::class, 'save'])->name('settings.save');
         Route::put('/settings/notifications', [SettingsController::class, 'updateNotifications'])->name('settings.notifications.update');
-        
+
         // 🔐 Zapis Macierzy Uprawnień Ról
         Route::post('/permissions', [RolePermissionController::class, 'update'])->name('permissions.update');
 
@@ -119,7 +134,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
      * ─── MODUŁ MENEDŻERA (Zarządzanie pizzerią) ───
      */
     Route::middleware(['role:manager,admin'])->prefix('manager')->name('manager.')->group(function () {
-        
+
         // 📊 Dashboard BI
         Route::get('/dashboard', function () { 
             $totalRevenue = 0;
@@ -171,21 +186,29 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ]
             ]); 
         })->name('dashboard');
-        
+
+        // 🏷️ Zarządzanie Promocjami
+        Route::middleware('permission:settings.discounts')->group(function () {
+            Route::get('/promotions', [PromotionController::class, 'index'])->name('promotions.index');
+            Route::post('/promotions', [PromotionController::class, 'store'])->name('promotions.store');
+            Route::patch('/promotions/{promotion}/toggle', [PromotionController::class, 'toggle'])->name('promotions.toggle');
+            Route::delete('/promotions/{promotion}', [PromotionController::class, 'destroy'])->name('promotions.destroy');
+        });
+
         // 🍕 Kreator produktów karty dań (CRUD)
         Route::middleware('permission:products.manage')->group(function () {
             Route::get('/products', [ProductController::class, 'index'])->name('products.index');
             Route::post('/products', [ProductController::class, 'store'])->name('products.store');
             Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
             Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
-            
+
             Route::post('/products/{product}/variants', [ProductController::class, 'storeVariant'])->name('products.variants.store');
             Route::delete('/products/variants/{variant}', [ProductController::class, 'destroyVariant'])->name('products.variants.destroy');
-            
+
             Route::post('/products/variants/{variant}/recipe', [ProductController::class, 'saveRecipe'])->name('products.save_recipe');
             Route::post('/bom/save-variant-recipe', [BomController::class, 'saveVariantRecipe'])->name('bom.save-variant-recipe');
         });
-        
+
         // 📦 Gospodarka magazynowa surowców & Przesunięcia MM
         Route::middleware('permission:inventory.manage')->group(function () {
             Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory');

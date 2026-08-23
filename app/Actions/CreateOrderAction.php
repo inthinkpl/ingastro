@@ -10,6 +10,7 @@ use App\Models\Ingredient;
 use App\Models\DiscountCode;
 use App\Models\LoyaltyAccount;
 use App\Models\LoyaltySetting;
+use App\Services\PromotionService;
 use Illuminate\Support\Facades\DB;
 use Exception;
 use App\Events\OrderPlaced;
@@ -21,7 +22,7 @@ use App\Services\Delivery\RouteOptimizationService;
 class CreateOrderAction
 {
     /**
-     * Wykonuje pełny potok zapisu zamówienia oraz aktualizacji magazynu i programu lojalnościowego.
+     * Wykonuje pełny potok zapisu zamówienia oraz aktualizacji magazynu, promocji i programu lojalnościowego.
      *
      * @param array $data Dane wejściowe
      * @return Order
@@ -52,6 +53,7 @@ class CreateOrderAction
             ]);
 
             $totalPrice = 0.00;
+            $itemsForPromo = [];
 
             // 2. Przetwarzamy pozycje z koszyka
             foreach ($data['items'] as $itemData) {
@@ -66,10 +68,33 @@ class CreateOrderAction
                     'subtotal'           => $subtotal,
                 ]);
 
+                // Tablica wygenerowana na potrzeby przeliczania silnika promocji
+                $itemsForPromo[] = [
+                    'product_variant_id' => $variant->id,
+                    'quantity'           => $itemData['quantity'],
+                    'price'              => (float) $variant->price,
+                ];
+
                 $this->processInventory($variant, $itemData['quantity'], $itemData['modifiers'] ?? [], $orderItem, $data);
             }
 
-            // 3. Obsługa kodów rabatowych
+            // 3. SILNIK AUTOMATYCZNYCH PROMOCJI (PromotionService)
+            $promoService = new PromotionService();
+            $promoResult = $promoService->calculatePromotions($itemsForPromo);
+            $automaticDiscount = (float) ($promoResult['discount_amount'] ?? 0.00);
+
+            // Jeśli promocja przydziela darmowe pozycje (gratisy), dopisujemy je do bazy zamówienia z kwotą 0.00 zł
+            if (!empty($promoResult['free_items'])) {
+                foreach ($promoResult['free_items'] as $freeItem) {
+                    $order->items()->create([
+                        'product_variant_id' => $freeItem['product_variant_id'],
+                        'quantity'           => $freeItem['quantity'],
+                        'subtotal'           => 0.00,
+                    ]);
+                }
+            }
+
+            // 4. Obsługa ręcznych kodów rabatowych
             $discountAmount = 0.00;
 
             if (!empty($data['discount_code'])) {
@@ -89,12 +114,12 @@ class CreateOrderAction
             // Kwota rabatu lojalnościowego
             $loyaltyDiscount = (float) ($data['loyalty_discount'] ?? 0.00);
 
-            // Ostateczna kwota do zapłaty
-            $finalPrice = max(0.00, $totalPrice - $discountAmount - $loyaltyDiscount);
+            // Ostateczna kwota do zapłaty z uwzględnieniem automatycznych promocji
+            $finalPrice = max(0.00, $totalPrice - $automaticDiscount - $discountAmount - $loyaltyDiscount);
 
             $order->update(['total_price' => $finalPrice]);
 
-            // 4. PROGRAM LOJALNOŚCIOWY – NALICZANIE I REJESTRACJA PUNKTÓW
+            // 5. PROGRAM LOJALNOŚCIOWY – NALICZANIE I REJESTRACJA PUNKTÓW
             if (!empty($data['phone'])) {
                 $cleanPhone = preg_replace('/[^0-9]/', '', $data['phone']);
                 if (strlen($cleanPhone) >= 9) {
@@ -119,7 +144,7 @@ class CreateOrderAction
                 }
             }
 
-            // 5. OBSŁUGA DOSTAWY, GEOLOKALIZACJI I KIEROWCY
+            // 6. OBSŁUGA DOSTAWY, GEOLOKALIZACJI I KIEROWCY
             if ($order->type === 'dostawa' && !empty($order->delivery_address)) {
                 $geocoder = new GeocodingService();
                 $coords = $geocoder->geocodeAddress($order->delivery_address);
@@ -140,7 +165,7 @@ class CreateOrderAction
                 }
             }
 
-            // 6. URUCHOMIENIE PROCESÓW (KDS / Drukarki / Redisa)
+            // 7. URUCHOMIENIE PROCESÓW (KDS / Drukarki / Redisa)
             if (!$isOnlinePayment) {
                 event(new OrderPlaced($order));
                 ProcessOrderJob::dispatch($order);

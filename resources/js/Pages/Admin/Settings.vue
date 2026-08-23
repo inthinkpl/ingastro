@@ -1,8 +1,8 @@
 <script setup>
 import { ref, onMounted } from 'vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { MapPin, Ticket, Bell, CreditCard, ShieldCheck } from 'lucide-vue-next';
+import { MapPin, Ticket, Bell, CreditCard, ShieldCheck, Tag } from 'lucide-vue-next';
 
 // Komponenty cząstkowe
 import GeneralSettingsForm from './Partials/GeneralSettingsForm.vue';
@@ -85,6 +85,16 @@ onMounted(() => {
                         {{ discountCodes.length }}
                     </span>
                 </button>
+
+                <!-- BEZPOŚREDNI ODNOŚNIK DO MODUŁU PROMOCJI I GRATISÓW -->
+                <Link 
+                    v-if="hasPermission('settings.discounts')"
+                    :href="route('manager.promotions.index')"
+                    class="px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider font-bold border transition-all flex items-center space-x-2 cursor-pointer bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:border-amber-500/50"
+                >
+                    <Tag class="w-4 h-4 text-amber-500" />
+                    <span>Promocje & Gratisy</span>
+                </Link>
 
                 <button 
                     v-if="hasPermission('settings.notifications')"
