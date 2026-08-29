@@ -84,6 +84,11 @@ const handleAddVariant = () => {
 
 // Usuwanie wariantu rozmiarowego
 const handleDeleteVariant = (variantId) => {
+    if (props.product?.variants?.length <= 1) {
+        alert('Produkt musi posiadać przynajmniej jeden wariant cenowy!');
+        return;
+    }
+
     if (confirm('Czy na pewno chcesz usunąć ten wariant rozmiarowy?')) {
         router.delete(route('manager.products.variants.destroy', variantId), {
             preserveScroll: true,
@@ -215,7 +220,7 @@ const handleSaveRecipe = () => {
                         <input 
                             v-model="variantForm.size_name" 
                             type="text" 
-                            placeholder="Rozmiar (np. Gigant 50cm)" 
+                            placeholder="Rozmiar (np. Porcja Powiększona 500g)" 
                             class="flex-1 bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-1.5 text-xs text-white"
                             required 
                         />

@@ -1,5 +1,5 @@
 <script setup>
-import { Utensils, ShoppingBag, Truck, Play, CheckCircle2, ArrowRight, Plus, Minus } from 'lucide-vue-next';
+import { Utensils, ShoppingBag, Truck, Play, CheckCircle2, ArrowRight, Plus, Minus, PackageCheck } from 'lucide-vue-next';
 
 const props = defineProps({
     order: Object,
@@ -25,10 +25,10 @@ const getOrderTypeBadge = (type) => {
 <template>
     <div 
         :class="[
-            order.status === 'gotowe' ? 'border-emerald-500/50 bg-emerald-950/10' : 'border-slate-800 bg-slate-900',
-            order.status === 'w_przygotowaniu' ? 'border-amber-500/40' : ''
+            order.status === 'gotowe' ? 'border-emerald-500/80 bg-emerald-950/20 shadow-emerald-950/30' : 'border-slate-800 bg-slate-900',
+            order.status === 'w_przygotowaniu' ? 'border-amber-500/50 bg-slate-900/90' : ''
         ]"
-        class="border rounded-3xl p-5 shadow-xl flex flex-col justify-between space-y-4 transition"
+        class="border rounded-3xl p-5 shadow-xl flex flex-col justify-between space-y-4 transition duration-300"
     >
         <div class="space-y-4">
             <!-- NAGŁÓWEK BONU -->
@@ -46,8 +46,13 @@ const getOrderTypeBadge = (type) => {
                 </span>
             </div>
 
+            <!-- ADRES DLA DOSTAWY -->
+            <p v-if="order.type === 'dostawa' && order.delivery_address" class="text-xs text-slate-400 -mt-2 truncate font-medium">
+                {{ order.delivery_address }}
+            </p>
+
             <!-- POZYCJE DANIOWE (BOM) -->
-            <div class="space-y-2.5">
+            <div class="space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
                 <div 
                     v-for="item in order.items" 
                     :key="item.id" 
@@ -79,36 +84,40 @@ const getOrderTypeBadge = (type) => {
             </div>
         </div>
 
-        <!-- PRZYCISKI AKCJI (MASZYNA STANÓW) -->
+        <!-- PRZYCISKI AKCJI (MASZYNA STANÓW KDS) -->
         <div class="pt-3 border-t border-slate-800">
+            <!-- KROK 1: NOWE ZAMÓWIENIE -> ROZPOCZNIJ PRACĘ -->
             <button 
                 v-if="order.status === 'nowe'"
                 @click="$emit('change-status', { orderId: order.id, nextStatus: 'w_przygotowaniu' })"
                 :disabled="processing"
-                class="w-full bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-700 hover:to-amber-600 text-white font-bold text-xs py-3 rounded-xl uppercase tracking-wider transition shadow-lg flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+                class="w-full bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-700 hover:to-amber-600 text-white font-black text-xs py-3 rounded-xl uppercase tracking-wider transition shadow-lg flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
             >
                 <Play class="w-4 h-4 fill-current" />
                 <span>Rozpocznij pracę</span>
             </button>
 
+            <!-- KROK 2: W PRZYGOTOWANIU -> OZNACZ JAKO GOTOWE (ZOSTAJE W KDS) -->
             <button 
                 v-if="order.status === 'w_przygotowaniu'"
                 @click="$emit('change-status', { orderId: order.id, nextStatus: 'gotowe' })"
                 :disabled="processing"
-                class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs py-3 rounded-xl uppercase tracking-wider transition shadow-lg flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+                class="w-full bg-blue-600 hover:bg-blue-500 text-white font-black text-xs py-3 rounded-xl uppercase tracking-wider transition shadow-lg flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
             >
                 <CheckCircle2 class="w-4 h-4" />
                 <span>Oznacz jako gotowe</span>
             </button>
 
+            <!-- KROK 3: GOTOWE -> WYDAJ Z KUCHNI (ZNIKA Z KDS, DLA DOSTAWY USTA W TRASIE) -->
             <button 
                 v-if="order.status === 'gotowe'"
                 @click="$emit('change-status', { orderId: order.id, nextStatus: 'wydane' })"
                 :disabled="processing"
-                class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-3 rounded-xl uppercase tracking-wider transition shadow-lg flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+                class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs py-3 rounded-xl uppercase tracking-wider transition shadow-lg flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50 animate-pulse"
             >
-                <ArrowRight class="w-4 h-4" />
-                <span>Wydaj z kuchni</span>
+                <Truck v-if="order.type === 'dostawa'" class="w-4 h-4" />
+                <PackageCheck v-else class="w-4 h-4" />
+                <span>Wydaj z kuchni {{ order.type === 'dostawa' ? '(W trasę)' : '' }}</span>
             </button>
         </div>
     </div>

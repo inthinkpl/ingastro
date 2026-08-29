@@ -163,10 +163,11 @@ const toggleTeamMenu = () => {
                     </div>
                 </div>
 
-                <!-- NAWIGACJA -->
+                <!-- NAWIGACJA Z FILTRACJĄ UPRAWNIEŃ RÓL -->
                 <nav class="space-y-1">
+                    <!-- KASA POS (KELNER) -->
                     <Link 
-                        v-if="canAny(['staff', 'waiter', 'manager', 'admin']) || userRole === 'waiter'"
+                        v-if="can('pos.access') || userRole === 'waiter'"
                         :href="route('order.pos')" 
                         :class="route().current('order.pos') || route().current('pos.*') ? 'bg-red-600 text-white font-bold border-red-500 shadow-lg shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
                         class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider border transition-all"
@@ -175,8 +176,9 @@ const toggleTeamMenu = () => {
                         <span>Kasa POS (Kelner)</span>
                     </Link>
 
+                    <!-- EKRAN KUCHENNY KDS -->
                     <Link 
-                        v-if="['chef', 'manager', 'admin'].includes(userRole)"
+                        v-if="can('kds.access') || userRole === 'chef'"
                         :href="route('kds.index')" 
                         :class="route().current('kds.*') ? 'bg-red-600 text-white font-bold border-red-500 shadow-lg shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
                         class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider border transition-all"
@@ -185,8 +187,9 @@ const toggleTeamMenu = () => {
                         <span>Ekran Kuchenny KDS</span>
                     </Link>
 
+                    <!-- LISTA ZAMÓWIEŃ -->
                     <Link 
-                        v-if="['manager', 'admin'].includes(userRole)"
+                        v-if="can('orders.view')"
                         :href="route('admin.orders.index')" 
                         :class="route().current('admin.orders.*') ? 'bg-red-600 text-white font-bold border-red-500 shadow-lg shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
                         class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider border transition-all"
@@ -195,8 +198,9 @@ const toggleTeamMenu = () => {
                         <span>Lista Zamówień</span>
                     </Link>
 
+                    <!-- DASHBOARD FINANSOWY -->
                     <Link 
-                        v-if="['manager', 'admin'].includes(userRole)"
+                        v-if="can('dashboard.financial')"
                         :href="route('manager.dashboard')" 
                         :class="route().current('manager.dashboard') ? 'bg-red-600 text-white font-bold border-red-500 shadow-lg shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
                         class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider border transition-all"
@@ -205,6 +209,7 @@ const toggleTeamMenu = () => {
                         <span>Dashboard Finansowy</span>
                     </Link>
 
+                    <!-- KREATORY MENU I RECEPTURY BOM -->
                     <Link 
                         v-if="can('products.manage')"
                         :href="route('manager.products.index')" 
@@ -215,6 +220,7 @@ const toggleTeamMenu = () => {
                         <span>Kreator Menu i BOM</span>
                     </Link>
 
+                    <!-- GOSPODARKA MAGAZYNOWA SUROWCÓW -->
                     <Link 
                         v-if="can('inventory.manage')"
                         :href="route('manager.inventory')" 
@@ -225,9 +231,9 @@ const toggleTeamMenu = () => {
                         <span>Magazyn Surowców</span>
                     </Link>
 
-                    <!-- PROGRAM LOJALNOŚCIOWY & CRM -->
+                    <!-- PROGRAM LOJALNOŚCIOWY -->
                     <Link 
-                        v-if="can('settings.discounts') || ['admin', 'manager'].includes(userRole)"
+                        v-if="can('loyalty.manage')"
                         :href="route('manager.loyalty.index')" 
                         :class="route().current('manager.loyalty.*') ? 'bg-red-600 text-white font-bold border-red-500 shadow-lg shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
                         class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider border transition-all"
@@ -238,7 +244,7 @@ const toggleTeamMenu = () => {
 
                     <!-- PROMOCJE I GRATISY -->
                     <Link 
-                        v-if="can('settings.discounts') || ['admin', 'manager'].includes(userRole)"
+                        v-if="can('promotions.manage')"
                         :href="route('manager.promotions.index')" 
                         :class="route().current('manager.promotions.*') ? 'bg-red-600 text-white font-bold border-red-500 shadow-lg shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
                         class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider border transition-all"
@@ -247,8 +253,8 @@ const toggleTeamMenu = () => {
                         <span>Promocje & Gratisy</span>
                     </Link>
 
-                    <!-- ROZSUWANE SUBMENU: ZARZĄDZANIE ZESPOŁEM (Admin / Manager) -->
-                    <div v-if="can('users.manage') || ['admin', 'manager'].includes(userRole)" class="space-y-1">
+                    <!-- ROZSUWANE SUBMENU: ZARZĄDZANIE ZESPOŁEM -->
+                    <div v-if="canAny(['users.manage', 'rcp.view'])" class="space-y-1">
                         <button 
                             @click="toggleTeamMenu"
                             :class="route().current('admin.users.*') || route().current('admin.rcp.*') ? 'text-white font-bold bg-slate-800/80 border-slate-700' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
@@ -263,6 +269,7 @@ const toggleTeamMenu = () => {
 
                         <div v-show="isTeamMenuOpen" class="pl-4 space-y-1 pt-1 border-l-2 border-slate-800 ml-3">
                             <Link 
+                                v-if="can('users.manage')"
                                 :href="route('admin.users.index')"
                                 :class="route().current('admin.users.*') ? 'bg-red-600 text-white font-bold border-red-500' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
                                 class="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-[11px] uppercase tracking-wider border transition-all"
@@ -272,6 +279,7 @@ const toggleTeamMenu = () => {
                             </Link>
 
                             <Link 
+                                v-if="can('rcp.view')"
                                 :href="route('admin.rcp.index')"
                                 :class="route().current('admin.rcp.*') ? 'bg-red-600 text-white font-bold border-red-500' : 'text-slate-400 hover:bg-slate-800 hover:text-white border-transparent'"
                                 class="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-[11px] uppercase tracking-wider border transition-all"
@@ -282,6 +290,7 @@ const toggleTeamMenu = () => {
                         </div>
                     </div>
 
+                    <!-- ROZLICZENIA KURIERÓW -->
                     <Link 
                         v-if="can('reconciliation.view')"
                         :href="route('manager.reconciliation.index')" 
@@ -292,6 +301,7 @@ const toggleTeamMenu = () => {
                         <span>Rozliczenia Kurierów</span>
                     </Link>
 
+                    <!-- STREFY DOSTAW -->
                     <Link 
                         v-if="can('delivery_zones.manage')"
                         :href="route('manager.delivery_zones.index')" 
@@ -302,6 +312,7 @@ const toggleTeamMenu = () => {
                         <span>Strefy Dostaw</span>
                     </Link>
 
+                    <!-- USTAWIENIA GLOBALNE -->
                     <Link 
                         v-if="canAny(['settings.general', 'settings.discounts', 'settings.payments'])"
                         :href="route('admin.settings.edit')" 

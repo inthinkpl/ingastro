@@ -4,7 +4,7 @@ import { useForm } from '@inertiajs/vue3';
 import axios from 'axios';
 import { ShoppingBag } from 'lucide-vue-next';
 
-// Imporotowanie wydzielonych kroków
+// Importowanie wydzielonych kroków
 import CartStep1Cart from './Partials/CartStep1Cart.vue';
 import CartStep2Delivery from './Partials/CartStep2Delivery.vue';
 import CartStep3Payment from './Partials/CartStep3Payment.vue';
@@ -252,8 +252,11 @@ const checkout = () => {
 
     form.post(route('order.store'), {
         onSuccess: () => {
+            // Czyszczenie pamięci przeglądarki oraz powiadomienie nadrzędnego komponentu
+            localStorage.removeItem('savona_cart');
             emit('clear-cart');
 
+            // Reset pól formularza oraz dodatkowych wartości
             form.reset('delivery_address', 'discount_code', 'phone', 'loyalty_discount');
             appliedDiscount.value = null;
             discountCodeInput.value = '';
@@ -263,7 +266,7 @@ const checkout = () => {
             freeItemsFromPromo.value = [];
             currentStep.value = 1;
 
-            alert('Grazie! Twoje zamówienie zostało przekazane do realizacji.');
+            alert('Super! Twoje zamówienie zostało przekazane do realizacji.');
         }
     });
 };

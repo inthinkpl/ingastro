@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import { Plus, X, Upload, Trash2, Wand2 } from 'lucide-vue-next';
 
@@ -12,23 +12,42 @@ const emit = defineEmits(['close']);
 
 const isCustomCategory = ref(false);
 
-// Szablony wariantów dla pizzerii i gastronomii
+// Rozszerzone szablony wariantów dla wszystkich popularnych kategorii w gastronomii
 const VARIANT_PRESETS = {
     'Pizza': [
         { size_name: 'Mała (32cm)', price: 28.00 },
         { size_name: 'Duża (42cm)', price: 38.00 }
     ],
+    'Makarony': [
+        { size_name: 'Porcja Standard (350g)', price: 32.00 },
+        { size_name: 'Porcja Powiększona (500g)', price: 42.00 }
+    ],
+    'Pasta': [
+        { size_name: 'Porcja Standard (350g)', price: 32.00 },
+        { size_name: 'Porcja Powiększona (500g)', price: 42.00 }
+    ],
     'Sałatki': [
         { size_name: 'Porcja Standard (300g)', price: 24.00 },
         { size_name: 'Porcja Maxi (500g)', price: 32.00 }
+    ],
+    'Burger': [
+        { size_name: 'Pojedynczy (160g)', price: 29.00 },
+        { size_name: 'Podwójny (320g)', price: 39.00 }
     ],
     'Napoje': [
         { size_name: 'Puszka 0.33l', price: 7.00 },
         { size_name: 'Butelka 0.5l', price: 9.00 },
         { size_name: 'Butelka 1l', price: 14.00 }
     ],
+    'Desery': [
+        { size_name: 'Porcja Standard', price: 18.00 }
+    ],
     'Sosy': [
         { size_name: 'Pojemnik 50ml', price: 4.00 }
+    ],
+    'Frytki': [
+        { size_name: 'Małe (150g)', price: 10.00 },
+        { size_name: 'Duże (250g)', price: 15.00 }
     ]
 };
 
@@ -44,6 +63,13 @@ const addForm = useForm({
     ]
 });
 
+// Automatyczne dopasowanie wariantów przy zmianie kategorii z listy
+watch(() => addForm.category, (newCategory) => {
+    if (newCategory && VARIANT_PRESETS[newCategory]) {
+        applyPreset();
+    }
+});
+
 const toggleCategoryMode = () => {
     isCustomCategory.value = !isCustomCategory.value;
     if (isCustomCategory.value) {
@@ -57,6 +83,9 @@ const applyPreset = () => {
     const preset = VARIANT_PRESETS[addForm.category];
     if (preset) {
         addForm.variants = preset.map(v => ({ size_name: v.size_name, price: v.price }));
+    } else {
+        // Domyślny fallback gdy kategoria jest niestandardowa
+        addForm.variants = [{ size_name: 'Porcja Standard', price: 0.00 }];
     }
 };
 
@@ -105,7 +134,7 @@ const submitAdd = () => {
                 <!-- NAZWA POTRAWY -->
                 <div>
                     <label class="block font-bold text-slate-400 uppercase mb-1">Nazwa potrawy</label>
-                    <input v-model="addForm.name" type="text" placeholder="np. Pizza Capricciosa" class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2.5 text-white font-medium focus:border-red-500" required />
+                    <input v-model="addForm.name" type="text" placeholder="np. Spaghetti Carbonara / Pizza Capricciosa" class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2.5 text-white font-medium focus:border-red-500" required />
                     <span v-if="addForm.errors.name" class="text-red-400 block mt-1">{{ addForm.errors.name }}</span>
                 </div>
 
@@ -135,7 +164,7 @@ const submitAdd = () => {
                         v-else 
                         v-model="addForm.category" 
                         type="text" 
-                        placeholder="np. Desery, Burger..." 
+                        placeholder="np. Makarony, Desery, Burger..." 
                         class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2.5 text-white font-medium focus:border-red-500" 
                         required 
                     />
@@ -144,14 +173,14 @@ const submitAdd = () => {
                 <!-- WARIANTY ROZMIARÓW I CEN -->
                 <div class="space-y-2 border-t border-b border-slate-800 py-3">
                     <div class="flex justify-between items-center">
-                        <label class="block font-bold text-amber-500 uppercase">Warianty i Ceny (np. Mała / Duża)</label>
+                        <label class="block font-bold text-amber-500 uppercase">Warianty i Ceny (np. Mała / Duża / Porcja)</label>
                         <button 
                             type="button" 
                             @click="applyPreset" 
                             class="text-[10px] text-slate-400 hover:text-amber-400 font-bold uppercase flex items-center space-x-1 cursor-pointer"
                         >
                             <Wand2 class="w-3 h-3 text-amber-500" />
-                            <span>Załaduj warianty dla: {{ addForm.category }}</span>
+                            <span>Załaduj warianty dla: {{ addForm.category || 'Kategorii' }}</span>
                         </button>
                     </div>
 
@@ -160,7 +189,7 @@ const submitAdd = () => {
                             <input 
                                 v-model="v.size_name" 
                                 type="text" 
-                                placeholder="Rozmiar (np. 32cm, 0.5l)" 
+                                placeholder="Rozmiar / Porcja (np. 350g, 42cm, 0.5l)" 
                                 class="w-2/3 bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white" 
                                 required 
                             />
@@ -194,7 +223,7 @@ const submitAdd = () => {
                         class="w-full border border-dashed border-slate-800 hover:border-slate-700 text-slate-400 py-2 rounded-xl text-xs font-bold uppercase transition flex items-center justify-center space-x-1 cursor-pointer"
                     >
                         <Plus class="w-3.5 h-3.5 text-amber-500" />
-                        <span>Dodaj kolejny rozmiar</span>
+                        <span>Dodaj kolejny wariant / rozmiar</span>
                     </button>
                 </div>
 

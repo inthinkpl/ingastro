@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue';
-import { useForm } from '@inertiajs/vue3';
-import { Edit3, X, Upload } from 'lucide-vue-next';
+import { useForm, router } from '@inertiajs/vue3';
+import { Edit3, X, Upload, Trash2, Wand2, Plus } from 'lucide-vue-next';
 
 const props = defineProps({
     isOpen: Boolean,
@@ -11,8 +11,46 @@ const props = defineProps({
 
 const emit = defineEmits(['close']);
 
-// Stan przełącznika własnej kategorii
 const isCustomCategory = ref(false);
+
+// Rozszerzone presety dla wszystkich kategorii
+const VARIANT_PRESETS = {
+    'Pizza': [
+        { size_name: 'Mała (32cm)', price: 28.00 },
+        { size_name: 'Duża (42cm)', price: 38.00 }
+    ],
+    'Makarony': [
+        { size_name: 'Porcja Standard (350g)', price: 32.00 },
+        { size_name: 'Porcja Powiększona (500g)', price: 42.00 }
+    ],
+    'Pasta': [
+        { size_name: 'Porcja Standard (350g)', price: 32.00 },
+        { size_name: 'Porcja Powiększona (500g)', price: 42.00 }
+    ],
+    'Sałatki': [
+        { size_name: 'Porcja Standard (300g)', price: 24.00 },
+        { size_name: 'Porcja Maxi (500g)', price: 32.00 }
+    ],
+    'Burger': [
+        { size_name: 'Pojedynczy (160g)', price: 29.00 },
+        { size_name: 'Podwójny (320g)', price: 39.00 }
+    ],
+    'Napoje': [
+        { size_name: 'Puszka 0.33l', price: 7.00 },
+        { size_name: 'Butelka 0.5l', price: 9.00 },
+        { size_name: 'Butelka 1l', price: 14.00 }
+    ],
+    'Desery': [
+        { size_name: 'Porcja Standard', price: 18.00 }
+    ],
+    'Sosy': [
+        { size_name: 'Pojemnik 50ml', price: 4.00 }
+    ],
+    'Frytki': [
+        { size_name: 'Małe (150g)', price: 10.00 },
+        { size_name: 'Duże (250g)', price: 15.00 }
+    ]
+};
 
 const editForm = useForm({
     _method: 'PUT',
@@ -20,26 +58,38 @@ const editForm = useForm({
     category: '',
     description: '',
     image: null,
-    is_active: true
+    is_active: true,
+    variants: []
 });
 
-// Reagowanie na zmianę wybranego produktu
+// Reakcja na zmianę przekazanego produktu w propsach (napełnienie formularza)
 watch(() => props.product, (newProduct) => {
     if (newProduct) {
         editForm.name = newProduct.name || '';
         editForm.category = newProduct.category || '';
         editForm.description = newProduct.description || '';
-        editForm.image = null;
         editForm.is_active = Boolean(newProduct.is_active);
+        editForm.image = null;
 
-        // Jeśli kategoria dania nie znajduje się na liście domyślnych, przełącz na własny input
-        if (newProduct.category && props.categories && !props.categories.includes(newProduct.category)) {
-            isCustomCategory.value = true;
+        // Ładowanie istniejących wariantów produktu
+        if (newProduct.variants && newProduct.variants.length > 0) {
+            editForm.variants = newProduct.variants.map(v => ({
+                id: v.id,
+                size_name: v.size_name,
+                price: parseFloat(v.price)
+            }));
         } else {
-            isCustomCategory.value = false;
+            editForm.variants = [{ size_name: 'Porcja Standard', price: 0.00 }];
+        }
+
+        // Sprawdzamy czy kategoria produktu znajduje się na liście rozwijanej
+        if (props.categories && props.categories.length > 0) {
+            isCustomCategory.value = !props.categories.includes(newProduct.category);
+        } else {
+            isCustomCategory.value = true;
         }
     }
-}, { immediate: true });
+}, { immediate: true, deep: true });
 
 const toggleCategoryMode = () => {
     isCustomCategory.value = !isCustomCategory.value;
@@ -50,19 +100,54 @@ const toggleCategoryMode = () => {
     }
 };
 
+const applyPreset = () => {
+    const preset = VARIANT_PRESETS[editForm.category];
+    if (preset) {
+        editForm.variants = preset.map(v => ({ size_name: v.size_name, price: v.price }));
+    } else {
+        editForm.variants = [{ size_name: 'Porcja Standard', price: 0.00 }];
+    }
+};
+
+const addVariantRow = () => {
+    editForm.variants.push({ size_name: '', price: 0.00 });
+};
+
+// Usuwanie wariantu bezpośrednio z poziomu modalu
+const removeVariantRow = (index) => {
+    const variantToRemove = editForm.variants[index];
+
+    if (editForm.variants.length <= 1) {
+        alert('Produkt musi posiadać przynajmniej jeden wariant cenowy!');
+        return;
+    }
+
+    // Jeśli wariant istnieje już w bazie danych (posiada ID), wysyłamy żądanie DELETE do backendu
+    if (variantToRemove && variantToRemove.id) {
+        if (confirm(`Czy na pewno chcesz usunąć wariant "${variantToRemove.size_name}"?`)) {
+            router.delete(route('manager.products.variants.destroy', variantToRemove.id), {
+                preserveScroll: true,
+                onSuccess: () => {
+                    editForm.variants.splice(index, 1);
+                }
+            });
+        }
+    } else {
+        // Jeśli był to nowo dodany wariant w formularzu (brak ID w bazie) - usuwamy z tablicy
+        editForm.variants.splice(index, 1);
+    }
+};
+
 const handleClose = () => {
-    isCustomCategory.value = false;
     emit('close');
 };
 
 const submitEdit = () => {
     if (!props.product) return;
 
-    // Przesyłamy formularz metodą POST z polem _method: 'PUT' dla sprawnej obsługi plików multimedialnych w Laravelu
     editForm.post(route('manager.products.update', props.product.id), {
         preserveScroll: true,
         onSuccess: () => {
-            isCustomCategory.value = false;
             emit('close');
         }
     });
@@ -71,26 +156,27 @@ const submitEdit = () => {
 
 <template>
     <div v-if="isOpen && product" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             
-            <div class="border-b border-slate-800 pb-3 flex justify-between items-center">
+            <div class="border-b border-slate-800 pb-3 flex justify-between items-center sticky top-0 bg-slate-900 z-10">
                 <h3 class="text-xs font-bold text-amber-500 uppercase tracking-widest flex items-center space-x-2">
                     <Edit3 class="w-4 h-4" />
-                    <span>Edytuj Pozycję w Menu</span>
+                    <span>Edycja Pozycji: {{ product.name }}</span>
                 </h3>
-                <button @click="handleClose" class="text-slate-500 hover:text-white p-1 cursor-pointer">
+                <button type="button" @click="handleClose" class="text-slate-500 hover:text-white p-1 cursor-pointer">
                     <X class="w-5 h-5" />
                 </button>
             </div>
             
             <form @submit.prevent="submitEdit" class="space-y-4 text-xs">
+                <!-- NAZWA POTRAWY -->
                 <div>
                     <label class="block font-bold text-slate-400 uppercase mb-1">Nazwa potrawy</label>
-                    <input v-model="editForm.name" type="text" class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2.5 text-white font-medium focus:border-amber-500" required />
+                    <input v-model="editForm.name" type="text" class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2.5 text-white font-medium focus:border-red-500" required />
                     <span v-if="editForm.errors.name" class="text-red-400 block mt-1">{{ editForm.errors.name }}</span>
                 </div>
 
-                <!-- SEKCJA WYBORU / EDYCJI KATEGORII -->
+                <!-- KATEGORIA -->
                 <div>
                     <div class="flex justify-between items-center mb-1">
                         <label class="block font-bold text-slate-400 uppercase">Kategoria</label>
@@ -99,14 +185,14 @@ const submitEdit = () => {
                             @click="toggleCategoryMode" 
                             class="text-[11px] text-amber-500 hover:text-amber-400 font-bold uppercase transition cursor-pointer"
                         >
-                            {{ isCustomCategory ? '← Wybierz z listy' : '+ Wpisz nową kategorię' }}
+                            {{ isCustomCategory ? '← Wybierz z listy' : '+ Wpisz nową' }}
                         </button>
                     </div>
 
                     <select 
                         v-if="!isCustomCategory" 
                         v-model="editForm.category" 
-                        class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2.5 text-white font-medium focus:border-amber-500 cursor-pointer" 
+                        class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2.5 text-white font-medium focus:border-red-500 cursor-pointer" 
                         required
                     >
                         <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
@@ -116,36 +202,97 @@ const submitEdit = () => {
                         v-else 
                         v-model="editForm.category" 
                         type="text" 
-                        placeholder="Wpisz nową kategorię..." 
-                        class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2.5 text-white font-medium focus:border-amber-500" 
+                        placeholder="np. Makarony, Desery, Burger..." 
+                        class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2.5 text-white font-medium focus:border-red-500" 
                         required 
                     />
-                    <span v-if="editForm.errors.category" class="text-red-400 block mt-1">{{ editForm.errors.category }}</span>
                 </div>
 
+                <!-- WARIANTY ROZMIARÓW I CEN -->
+                <div class="space-y-2 border-t border-b border-slate-800 py-3">
+                    <div class="flex justify-between items-center">
+                        <label class="block font-bold text-amber-500 uppercase">Warianty i Ceny (Dowolna Kategoria)</label>
+                        <button 
+                            type="button" 
+                            @click="applyPreset" 
+                            class="text-[10px] text-slate-400 hover:text-amber-400 font-bold uppercase flex items-center space-x-1 cursor-pointer"
+                        >
+                            <Wand2 class="w-3 h-3 text-amber-500" />
+                            <span>Przywróć presety dla: {{ editForm.category || 'Kategorii' }}</span>
+                        </button>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div v-for="(v, idx) in editForm.variants" :key="v.id || idx" class="flex items-center space-x-2 bg-[#0B0F19] p-2 rounded-xl border border-slate-800">
+                            <input 
+                                v-model="v.size_name" 
+                                type="text" 
+                                placeholder="Rozmiar / Porcja (np. 350g, 42cm, 0.5l)" 
+                                class="w-2/3 bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white" 
+                                required 
+                            />
+                            
+                            <div class="w-1/3 relative">
+                                <input 
+                                    v-model.number="v.price" 
+                                    type="number" 
+                                    step="0.01" 
+                                    placeholder="Cena" 
+                                    class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-amber-400 font-mono font-bold pr-6 text-right" 
+                                    required 
+                                />
+                                <span class="absolute right-2 top-2 text-[10px] text-slate-500 font-bold">zł</span>
+                            </div>
+
+                            <button 
+                                type="button" 
+                                @click="removeVariantRow(idx)" 
+                                :disabled="editForm.variants.length === 1"
+                                class="text-slate-600 hover:text-red-400 disabled:opacity-20 p-1 cursor-pointer transition"
+                                title="Usuń ten wariant"
+                            >
+                                <Trash2 class="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <button 
+                        type="button" 
+                        @click="addVariantRow" 
+                        class="w-full border border-dashed border-slate-800 hover:border-slate-700 text-slate-400 py-2 rounded-xl text-xs font-bold uppercase transition flex items-center justify-center space-x-1 cursor-pointer"
+                    >
+                        <Plus class="w-3.5 h-3.5 text-amber-500" />
+                        <span>Dodaj nowy wariant / rozmiar</span>
+                    </button>
+                </div>
+
+                <!-- OPIS DANIA -->
                 <div>
-                    <label class="block font-bold text-slate-400 uppercase mb-1">Opis dania / Receptura marketingowa</label>
-                    <textarea v-model="editForm.description" rows="3" class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2.5 text-white font-medium focus:border-amber-500"></textarea>
+                    <label class="block font-bold text-slate-400 uppercase mb-1">Opis dania</label>
+                    <textarea v-model="editForm.description" rows="2" placeholder="Składniki, opis na stronę..." class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2.5 text-white font-medium focus:border-red-500"></textarea>
                 </div>
 
+                <!-- ZDJĘCIE -->
                 <div>
                     <label class="block font-bold text-slate-400 uppercase mb-1 flex items-center space-x-1">
                         <Upload class="w-3.5 h-3.5 text-amber-500" />
                         <span>Zmień zdjęcie potrawy (opcjonalnie)</span>
                     </label>
-                    <input type="file" @input="editForm.image = $event.target.files[0]" class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2 text-white font-medium focus:border-amber-500" accept="image/*" />
+                    <input type="file" @input="editForm.image = $event.target.files[0]" class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2 text-white font-medium focus:border-red-500" accept="image/*" />
                 </div>
 
+                <!-- AKTYWNY -->
                 <div class="flex items-center space-x-2 py-1">
-                    <input type="checkbox" v-model="editForm.is_active" id="edit_active" class="rounded border-slate-800 bg-[#0B0F19] text-amber-500 focus:ring-0 h-4 w-4 cursor-pointer" />
+                    <input type="checkbox" v-model="editForm.is_active" id="edit_active" class="rounded border-slate-800 bg-[#0B0F19] text-red-600 focus:ring-0 h-4 w-4 cursor-pointer" />
                     <label for="edit_active" class="font-bold text-slate-300 uppercase select-none cursor-pointer">Pozycja aktywna w menu</label>
                 </div>
 
+                <!-- PRZYCISKI -->
                 <div class="flex space-x-3 pt-3 border-t border-slate-800">
                     <button type="button" @click="handleClose" class="w-1/3 bg-[#0B0F19] hover:bg-slate-800 border border-slate-800 text-slate-400 py-3 rounded-xl font-bold uppercase transition cursor-pointer">
                         Anuluj
                     </button>
-                    <button type="submit" :disabled="editForm.processing" class="w-2/3 bg-amber-500 hover:bg-amber-600 font-bold text-slate-950 py-3 rounded-xl uppercase tracking-wider transition shadow-lg cursor-pointer disabled:opacity-50">
+                    <button type="submit" :disabled="editForm.processing" class="w-2/3 bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-700 hover:to-amber-600 font-bold text-white py-3 rounded-xl uppercase tracking-wider transition shadow-lg cursor-pointer disabled:opacity-50">
                         {{ editForm.processing ? 'Zapisywanie...' : 'Zapisz Zmiany' }}
                     </button>
                 </div>

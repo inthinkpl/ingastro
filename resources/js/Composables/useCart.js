@@ -4,9 +4,13 @@ import { ref, computed, watch } from 'vue';
 const savedCart = localStorage.getItem('savona_cart');
 const cart = ref(savedCart ? JSON.parse(savedCart) : []);
 
-// Automatyczny zapis w localStorage przy każdej zmianie w koszyku
+// Automatyczny zapis w localStorage przy zmianach w koszyku
 watch(cart, (newCart) => {
-    localStorage.setItem('savona_cart', JSON.stringify(newCart));
+    if (newCart && newCart.length > 0) {
+        localStorage.setItem('savona_cart', JSON.stringify(newCart));
+    } else {
+        localStorage.removeItem('savona_cart');
+    }
 }, { deep: true });
 
 export function useCart() {
@@ -20,6 +24,7 @@ export function useCart() {
 
     const clearCart = () => {
         cart.value = [];
+        localStorage.removeItem('savona_cart');
     };
 
     const cartSubtotal = computed(() => {

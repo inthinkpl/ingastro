@@ -103,16 +103,29 @@ class OrderController extends Controller
     }
 
     /**
-     * Aktualizacja statusu zamówienia przez kucharza na monitorze KDS.
+     * Aktualizacja statusu zamówienia przez kucharza na monitorze KDS, dostawcę lub managera.
      */
     public function updateStatus(Request $request, Order $order, LoyaltyService $loyaltyService)
     {
         $validated = $request->validate([
-            'status' => 'required|in:nowe,w_przygotowaniu,gotowe,w drodze,dostarczone,wydane'
+            'status' => 'required|string'
         ]);
 
         $oldStatus = $order->status;
-        $newStatus = $validated['status'];
+        $requestedStatus = $validated['status'];
+
+        // 🎯 OBSŁUGA PRZEPŁYWU KDS I DOSTAWY:
+        // 1. Jeśli to wydanie z kuchni lub odbiór przez dostawcę:
+        if (in_array($requestedStatus, ['wydane', 'w_dostawie', 'odbierz_z_kuchni'])) {
+            if ($order->type === 'dostawa') {
+                $newStatus = 'w_dostawie'; // Zamówienie z dostawą wyrusza w trasę (znika z KDS)
+            } else {
+                $newStatus = 'zrealizowane'; // Odbiór osobisty / na miejscu zostaje wydany i zrealizowany (znika z KDS)
+            }
+        } else {
+            // Dla pozostałych akcji (np. 'gotowe', 'w_przygotowaniu', 'dostarczone', 'anulowane')
+            $newStatus = $requestedStatus;
+        }
 
         $order->update([
             'status' => $newStatus
@@ -120,8 +133,8 @@ class OrderController extends Controller
 
         event(new OrderStatusUpdated($order));
 
-        // 📦 AUTOMATYKA BOM: Zdejmij surowce z Magazynu Lokalnego, gdy status zmienia się na 'gotowe'
-        if ($newStatus === 'gotowe' && $oldStatus !== 'gotowe') {
+        // 📦 AUTOMATYKA BOM: Zdejmij surowce z Magazynu Lokalnego przy przejściu na 'gotowe', 'w_dostawie' lub 'zrealizowane'
+        if (in_array($newStatus, ['gotowe', 'w_dostawie', 'wydane', 'zrealizowane']) && !in_array($oldStatus, ['gotowe', 'w_dostawie', 'wydane', 'zrealizowane'])) {
             $order->load(['items.variant.ingredients', 'items.modifiers']);
 
             foreach ($order->items as $item) {
@@ -165,8 +178,8 @@ class OrderController extends Controller
         }
 
         // 🎁 AUTOMATYKA PROGRAMU LOJALNOŚCIOWEGO:
-        // Naliczenie punktów po zrealizowaniu zamówienia
-        if (in_array($newStatus, ['gotowe', 'dostarczone', 'wydane']) && !in_array($oldStatus, ['gotowe', 'dostarczone', 'wydane'])) {
+        // Naliczenie punktów po wydaniu / wysłaniu zamówienia w trasę
+        if (in_array($newStatus, ['gotowe', 'w_dostawie', 'dostarczone', 'wydane', 'zrealizowane']) && !in_array($oldStatus, ['gotowe', 'w_dostawie', 'dostarczone', 'wydane', 'zrealizowane'])) {
             try {
                 $loyaltyService->addPointsForOrder($order);
             } catch (\Exception $e) {

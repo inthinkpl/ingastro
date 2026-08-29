@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { ShieldCheck, Save } from 'lucide-vue-next';
 
@@ -8,11 +8,41 @@ const props = defineProps({
     rolePermissions: Object
 });
 
+// Kompletnie zmapowana lista dostępnych modułów (używana jako fallback, gdy props jest pusty)
+const fallbackPermissions = {
+    'pos.access': 'Kasa POS (Kelner)',
+    'kds.access': 'Ekran Kuchenny KDS',
+    'orders.view': 'Lista Zamówień',
+    'dashboard.financial': 'Dashboard Finansowy',
+    'products.manage': 'Karty Dań i Receptury BOM',
+    'inventory.manage': 'Gospodarka Magazynowa Surowców',
+    'loyalty.manage': 'Program Lojalnościowy',
+    'promotions.manage': 'Promocje i Gratisy',
+    'users.manage': 'Zarządzanie Zespołem (Pracownicy)',
+    'rcp.view': 'Ewidencja Czasu Pracy (RCP)',
+    'reconciliation.view': 'Rozliczenia Kurierów',
+    'delivery_zones.manage': 'Strefy Dostaw',
+    'settings.general': 'Ustawienia Globalne'
+};
+
+const permissionsList = computed(() => {
+    return (props.availablePermissions && Object.keys(props.availablePermissions).length > 0)
+        ? props.availablePermissions
+        : fallbackPermissions;
+});
+
 const permissionsMatrix = ref({
-    manager: props.rolePermissions?.manager || ['settings.general', 'settings.discounts', 'settings.notifications', 'products.manage', 'inventory.manage', 'reconciliation.view', 'delivery_zones.manage'],
-    staff: props.rolePermissions?.staff || [],
-    chef: props.rolePermissions?.chef || [],
-    driver: props.rolePermissions?.driver || []
+    manager: props.rolePermissions?.manager || [
+        'products.manage',
+        'inventory.manage',
+        'orders.view',
+        'dashboard.financial',
+        'reconciliation.view',
+        'delivery_zones.manage'
+    ],
+    staff: props.rolePermissions?.staff || ['pos.access'],
+    chef: props.rolePermissions?.chef || ['kds.access'],
+    driver: props.rolePermissions?.driver || ['orders.view']
 });
 
 const togglePermission = (role, permKey) => {
@@ -57,8 +87,11 @@ const savePermissions = () => {
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800/60">
-                    <tr v-for="(label, key) in availablePermissions" :key="key" class="hover:bg-slate-800/30 transition">
-                        <td class="p-3 font-bold text-slate-200">{{ label }}</td>
+                    <tr v-for="(label, key) in permissionsList" :key="key" class="hover:bg-slate-800/30 transition">
+                        <td class="p-3 font-bold text-slate-200">
+                            {{ label }}
+                            <span class="block text-[9px] font-mono font-normal text-slate-500">{{ key }}</span>
+                        </td>
                         <td v-for="role in ['manager', 'staff', 'chef', 'driver']" :key="role" class="p-3 text-center">
                             <input 
                                 type="checkbox" 

@@ -18,17 +18,26 @@ class ProductController extends Controller
     public function index()
     {
         // Pobieramy produkty z ich wariantami oraz surowcami i wagą z pivota (amount_needed)
-        $products = Product::with(['variants.ingredients' => function($query) {
-            $query->select('ingredients.id', 'ingredients.name', 'ingredients.unit')
-                  ->withPivot('amount_needed');
-        }])->orderBy('category')->get();
+        $products = Product::where('is_active', true)
+            ->with(['variants' => function($query) {
+                $query->where('is_active', true); // Pobieramy aktywne warianty
+            }, 'variants.ingredients' => function($query) {
+                $query->select('ingredients.id', 'ingredients.name', 'ingredients.unit')
+                      ->withPivot('amount_needed');
+            }])
+            ->orderBy('category')
+            ->get();
 
         // Pobieramy wszystkie surowce z magazynu do listy wyboru we Vue
         $ingredients = Ingredient::orderBy('name', 'asc')->get();
 
+        // Pobieramy istniejące unikalne kategorie produktów dla filtrowania i podpowiedzi w modalach
+        $categories = Product::distinct()->pluck('category')->filter()->values()->all();
+
         return Inertia::render('Manager/Products', [
             'products'    => $products,
-            'ingredients' => $ingredients
+            'ingredients' => $ingredients,
+            'categories'  => $categories
         ]);
     }
 
@@ -61,11 +70,12 @@ class ProductController extends Controller
             'is_active'   => $validated['is_active'],
         ]);
 
-        // 2. Zapis przypisanych wariantów
+        // 2. Zapis przypisanych wariantów (domyślnie is_active = true)
         foreach ($validated['variants'] as $v) {
             $product->variants()->create([
                 'size_name' => $v['size_name'],
                 'price'     => $v['price'],
+                'is_active' => true,
             ]);
         }
 
@@ -105,7 +115,7 @@ class ProductController extends Controller
             'is_active'   => $validated['is_active'],
         ]);
 
-        // 2. Aktualizacja / Dodawanie / Usuwanie wariantów
+        // 2. Aktualizacja / Dodawanie / Soft-Dezaktywacja wariantów
         if (isset($validated['variants'])) {
             $updatedVariantIds = [];
 
@@ -116,6 +126,7 @@ class ProductController extends Controller
                         $variant->update([
                             'size_name' => $v['size_name'],
                             'price'     => $v['price'],
+                            'is_active' => true, // Zapewniamy aktywność
                         ]);
                         $updatedVariantIds[] = $variant->id;
                     }
@@ -123,33 +134,35 @@ class ProductController extends Controller
                     $newVariant = $product->variants()->create([
                         'size_name' => $v['size_name'],
                         'price'     => $v['price'],
+                        'is_active' => true,
                     ]);
                     $updatedVariantIds[] = $newVariant->id;
                 }
             }
 
-            $product->variants()->whereNotIn('id', $updatedVariantIds)->delete();
+            // Zamiast kasowania z bazy (co powoduje błąd SQL 23000 w zamówieniach), dezaktywujemy warianty
+            $product->variants()->whereNotIn('id', $updatedVariantIds)->update(['is_active' => false]);
         }
 
         return redirect()->back()->with('success', 'Dane produktu wraz z wariantami zostały zaktualizowane.');
     }
 
     /**
-     * Usuwa produkt z bazy danych oraz czyści pliki graficzne z dysku.
+     * Wyłącza (dezaktywuje) produkt oraz wszystkie jego warianty z karty dań.
      */
     public function destroy(Product $product)
     {
-        if ($product->image_path) {
-            Storage::disk('public')->delete($product->image_path);
-        }
+        // 1. Dezaktywujemy sam produkt
+        $product->update(['is_active' => false]);
 
-        $product->delete();
+        // 2. Dezaktywujemy wszystkie przypisane do niego warianty
+        $product->variants()->update(['is_active' => false]);
 
-        return redirect()->back()->with('success', 'Produkt został bezpowrotnie usunięty z systemu.');
+        return redirect()->back()->with('success', 'Produkt został pomyślnie wycofany z menu.');
     }
 
     /**
-     * Szybkie dodawanie nowego wariantu rozmiarowego z poziomu modalu BOM.
+     * Szybkie dodawanie nowego wariantu rozmiarowego z poziomu modalu BOM lub edycji.
      */
     public function storeVariant(Request $request, Product $product)
     {
@@ -158,19 +171,28 @@ class ProductController extends Controller
             'price'     => 'required|numeric|min:0',
         ]);
 
+        $validated['is_active'] = true;
+
         $product->variants()->create($validated);
 
         return redirect()->back()->with('success', 'Nowy wariant został dodany!');
     }
 
     /**
-     * Usuwa konkretny wariant rozmiarowy potrawy.
+     * Wyłącza (dezaktywuje) konkretny wariant rozmiarowy potrawy.
      */
     public function destroyVariant(ProductVariant $variant)
     {
-        $variant->delete();
+        // Zabezpieczenie: Produkt musi posiadać przynajmniej 1 aktywny wariant cenowy
+        $activeVariantsCount = $variant->product->variants()->where('is_active', true)->count();
+        if ($activeVariantsCount <= 1) {
+            return redirect()->back()->with('error', 'Błąd: Produkt musi posiadać przynajmniej jeden aktywny wariant cenowy!');
+        }
 
-        return redirect()->back()->with('success', 'Wariant został usunięty.');
+        // Zamiast usuwania z bazy, przełączamy status aktywności
+        $variant->update(['is_active' => false]);
+
+        return redirect()->back()->with('success', 'Wariant został pomyślnie wyłączony.');
     }
 
     /**

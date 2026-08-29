@@ -51,15 +51,18 @@ const filterProducts = (cat) => {
     activeCategoryFilter.value = cat;
 };
 
+// OBSŁUGA WYBORU WARIANTU – MODAL MODYFIKATORÓW TYLKO DLA KATEGORII PIZZA
 const handleVariantSelect = (product, variant) => {
-    const isPizza = product.category?.toLowerCase() === 'pizza';
+    const isPizza = (product.category || '').toLowerCase() === 'pizza';
     const hasIngredients = variant.ingredients && variant.ingredients.length > 0;
 
+    // Tylko kategoria Pizza otwiera ModifierModal (składniki BEZ / EKSTRA)
     if (isPizza && hasIngredients) {
         activeProduct.value = product;
         activeVariant.value = variant;
         isModifierModalOpen.value = true;
     } else {
+        // Wszystkie pozostałe potrawy (Makarony, Sałatki, Burgery, Napoje itp.) dodają się bezpośrednio do koszyka
         addToCart({
             variantId: variant.id,
             name: product.name,
@@ -96,7 +99,7 @@ const scrollToSection = (id) => {
                     </div>
                 </div>
 
-                <!-- KAFELKI KATEGORII (WSPÓŁDZIELONY KOMPONENT) -->
+                <!-- KAFELKI KATEGORII -->
                 <CategoryFilter 
                     :categories="uniqueCategories" 
                     :active-category="activeCategoryFilter" 
@@ -159,7 +162,7 @@ const scrollToSection = (id) => {
                     </div>
                 </div>
 
-                <!-- BOCZNY KOSZYK (WSPÓŁDZIELONY KOMPONENT) -->
+                <!-- BOCZNY KOSZYK -->
                 <div id="cart-section">
                     <CartSidebar 
                         :cart="cart"

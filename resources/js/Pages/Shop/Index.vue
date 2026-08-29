@@ -41,18 +41,20 @@ const filteredProducts = computed(() => {
 
 const filterProducts = (cat) => {
     activeCategoryFilter.value = cat;
-   
 };
 
+// OBSŁUGA WYBORU WARIANTU – MODAL MODYFIKATORÓW TYLKO DLA KATEGORII PIZZA
 const handleVariantSelect = (product, variant) => {
-    const isPizza = product.category?.toLowerCase() === 'pizza';
+    const isPizza = (product.category || '').toLowerCase() === 'pizza';
     const hasIngredients = variant.ingredients && variant.ingredients.length > 0;
 
+    // Tylko kategoria Pizza otwiera ModifierModal (składniki BEZ / EKSTRA)
     if (isPizza && hasIngredients) {
         activeProduct.value = product;
         activeVariant.value = variant;
         isModifierModalOpen.value = true;
     } else {
+        // Makarony, sałatki, burger itp. dodają się bezpośrednio do koszyka
         addToCart({
             variantId: variant.id,
             name: product.name,
@@ -81,7 +83,7 @@ const scrollToSection = (id) => {
             <!-- HERO -->
             <HeroSection @scroll-to-menu="scrollToSection('menu')" />
 
-            <!-- LOKALE BADGE (ODŚWIEŻONE KAFELKI Z IKONAMI SVG) -->
+            <!-- LOKALE BADGE (KAFELKI Z INFORMACJĄ O LOKALIZACJACH) -->
             <section class="relative z-20 -mt-14 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="grid md:grid-cols-2 gap-4">
                     <div class="bg-slate-900/95 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 shadow-2xl backdrop-blur-md flex items-center space-x-4 transition">
@@ -115,7 +117,7 @@ const scrollToSection = (id) => {
                         <p class="text-slate-400 text-sm">Kliknij kafel kategorii, aby odfiltrować wybrane specjały.</p>
                     </div>
 
-                    <!-- KAFELKI KATEGORII (KOMPONENT) -->
+                    <!-- KAFELKI KATEGORII -->
                     <CategoryFilter 
                         :categories="uniqueCategories" 
                         :active-category="activeCategoryFilter" 
@@ -133,7 +135,7 @@ const scrollToSection = (id) => {
                         
                         <!-- PRODUKTY -->
                         <div class="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div v-for="product in filteredProducts" :key="product.id" class="bg-slate-900 rounded-2xl overflow-hidden shadow-xl border border-slate-800 flex flex-col justify-between">
+                            <div v-for="product in filteredProducts" :key="product.id" class="bg-slate-900 rounded-2xl overflow-hidden shadow-xl border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition">
                                 <div>
                                     <div class="h-52 overflow-hidden relative bg-slate-950">
                                         <img v-if="product.image_path" :src="'/storage/' + product.image_path" :alt="product.name" class="w-full h-full object-cover opacity-90" />
@@ -151,6 +153,7 @@ const scrollToSection = (id) => {
                                     </div>
                                 </div>
 
+                                <!-- LISTA WARIANTÓW CENOWYCH DLA DANEJ POTRAWY -->
                                 <div class="p-6 pt-0 space-y-2">
                                     <button 
                                         v-for="variant in product.variants" 
@@ -190,7 +193,7 @@ const scrollToSection = (id) => {
             &copy; 2026 Pizzeria Savona Białystok. Wszelkie prawa zastrzeżone.
         </footer>
 
-        <!-- MODALE -->
+        <!-- MODALE SKLEPOWE -->
         <HalfHalfModal 
             v-if="halfHalfSettings?.enabled"
             :is-open="isHalfHalfModalOpen" 

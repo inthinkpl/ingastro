@@ -11,7 +11,10 @@ class ShopController extends Controller
 {
     public function index()
     {
-        $products = Product::with('variants.ingredients')
+        // Pobieramy tylko aktywne produkty oraz tylko ich AKTYWNE warianty
+        $products = Product::with(['variants' => function($query) {
+                $query->where('is_active', true);
+            }, 'variants.ingredients'])
             ->where('is_active', true)
             ->orderBy('category')
             ->get();
@@ -60,7 +63,10 @@ class ShopController extends Controller
 
     public function menu()
     {
-        $products = Product::with(['variants.ingredients'])
+        // Pobieramy tylko aktywne produkty oraz tylko ich AKTYWNE warianty
+        $products = Product::with(['variants' => function($query) {
+                $query->where('is_active', true);
+            }, 'variants.ingredients'])
             ->where('is_active', true)
             ->orderBy('category')
             ->get();

@@ -92,29 +92,29 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/rcp/clock-out', [RcpController::class, 'clockOut'])->name('rcp.clock-out');
 
     /*
-     * ─── MODUŁ ADMINISTRATORA I USTAWIEŃ GLOBALNYCH (Dostęp: Admin + Manager) ───
+     * ─── MODUŁ ADMINISTRATORA I USTAWIEŃ GLOBALNYCH (Dostęp: Admin + Manager / Zabezpieczenie RBAC) ───
      */
     Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
-        Route::get('/orders', [OrderAdminController::class, 'index'])->name('orders.index');
-        Route::patch('/orders/{order}/status', [OrderAdminController::class, 'updateStatus'])->name('orders.update-status');
+        Route::get('/orders', [OrderAdminController::class, 'index'])->middleware('permission:orders.view')->name('orders.index');
+        Route::patch('/orders/{order}/status', [OrderAdminController::class, 'updateStatus'])->middleware('permission:orders.view')->name('orders.update-status');
     });
 
     Route::middleware(['role:admin,manager'])->prefix('admin')->name('admin.')->group(function () {
 
         // ⏱️ Rejestracja Czasu Pracy (RCP) - Panel Ewidencji i Korekt
-        Route::get('/rcp', [RcpController::class, 'index'])->name('rcp.index');
-        Route::post('/rcp', [RcpController::class, 'store'])->name('rcp.store');
-        Route::put('/rcp/{shift}', [RcpController::class, 'update'])->name('rcp.update');
+        Route::get('/rcp', [RcpController::class, 'index'])->middleware('permission:rcp.view')->name('rcp.index');
+        Route::post('/rcp', [RcpController::class, 'store'])->middleware('permission:rcp.view')->name('rcp.store');
+        Route::put('/rcp/{shift}', [RcpController::class, 'update'])->middleware('permission:rcp.view')->name('rcp.update');
 
-        // Główne Ustawienia (Wizytówka, Powiadomienia Push, Bramki Płatności)
-        Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.edit');
-        Route::post('/settings', [SettingsController::class, 'save'])->name('settings.save');
-        Route::put('/settings/notifications', [SettingsController::class, 'updateNotifications'])->name('settings.notifications.update');
+        // Główne Ustawienia Globalne
+        Route::get('/settings', [SettingsController::class, 'edit'])->middleware('permission:settings.general')->name('settings.edit');
+        Route::post('/settings', [SettingsController::class, 'save'])->middleware('permission:settings.general')->name('settings.save');
+        Route::put('/settings/notifications', [SettingsController::class, 'updateNotifications'])->middleware('permission:settings.general')->name('settings.notifications.update');
 
-        // 🔐 Zapis Macierzy Uprawnień Ról
-        Route::post('/permissions', [RolePermissionController::class, 'update'])->name('permissions.update');
+        // 🔐 Zapis Macierzy Uprawnień Ról (oraz UserController dla zapisu z poziomu /admin/permissions)
+        Route::post('/permissions', [UserController::class, 'updatePermissions'])->name('permissions.update');
 
-        // 👥 Zarządzanie Zespołem (Zabezpieczone nowym uprawnieniem RBAC)
+        // 👥 Zarządzanie Zespołem (Zabezpieczone RBAC)
         Route::middleware('permission:users.manage')->group(function () {
             Route::get('/users', [UserController::class, 'index'])->name('users.index');
             Route::post('/users', [UserController::class, 'store'])->name('users.store');
@@ -122,8 +122,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
         });
 
-        // 🎟️ Trasy Zarządzania Kodami Rabatowymi (Zabezpieczone nowym uprawnieniem RBAC)
-        Route::middleware('permission:settings.discounts')->group(function () {
+        // 🎟️ Trasy Zarządzania Kodami Rabatowymi (Zabezpieczone RBAC)
+        Route::middleware('permission:promotions.manage')->group(function () {
             Route::post('/discount-codes', [DiscountCodeController::class, 'store'])->name('discount-codes.store');
             Route::patch('/discount-codes/{discountCode}/toggle', [DiscountCodeController::class, 'toggle'])->name('discount-codes.toggle');
             Route::delete('/discount-codes/{discountCode}', [DiscountCodeController::class, 'destroy'])->name('discount-codes.destroy');
@@ -135,7 +135,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
      */
     Route::middleware(['role:manager,admin'])->prefix('manager')->name('manager.')->group(function () {
 
-        // 📊 Dashboard BI
+        // 📊 Dashboard BI / Finansowy
         Route::get('/dashboard', function () { 
             $totalRevenue = 0;
             try {
@@ -185,17 +185,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     'top_products'    => $topProducts
                 ]
             ]); 
-        })->name('dashboard');
+        })->middleware('permission:dashboard.financial')->name('dashboard');
 
         // 🏷️ Zarządzanie Promocjami
-        Route::middleware('permission:settings.discounts')->group(function () {
+        Route::middleware('permission:promotions.manage')->group(function () {
             Route::get('/promotions', [PromotionController::class, 'index'])->name('promotions.index');
             Route::post('/promotions', [PromotionController::class, 'store'])->name('promotions.store');
             Route::patch('/promotions/{promotion}/toggle', [PromotionController::class, 'toggle'])->name('promotions.toggle');
             Route::delete('/promotions/{promotion}', [PromotionController::class, 'destroy'])->name('promotions.destroy');
         });
 
-        // 🍕 Kreator produktów karty dań (CRUD)
+        // 🍕 Kreator produktów karty dań i receptury BOM
         Route::middleware('permission:products.manage')->group(function () {
             Route::get('/products', [ProductController::class, 'index'])->name('products.index');
             Route::post('/products', [ProductController::class, 'store'])->name('products.store');
@@ -222,7 +222,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         });
 
         // 🎁 Program Lojalnościowy i CRM Klientów
-        Route::middleware('permission:settings.discounts')->group(function () {
+        Route::middleware('permission:loyalty.manage')->group(function () {
             Route::get('/loyalty', [LoyaltyAdminController::class, 'index'])->name('loyalty.index');
             Route::put('/loyalty/settings', [LoyaltyAdminController::class, 'updateSettings'])->name('loyalty.settings.update');
             Route::post('/loyalty/customers/{customer}/adjust', [LoyaltyAdminController::class, 'adjustPoints'])->name('loyalty.adjust');
@@ -242,7 +242,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::delete('/delivery-zones/{deliveryZone}', [DeliveryZoneController::class, 'destroy'])->name('delivery_zones.destroy');
         });
 
-        Route::post('/orders/{order}/assign-driver', [DriverDeliveryController::class, 'assignDriver'])->name('orders.assign_driver');
+        Route::post('/orders/{order}/assign-driver', [DriverDeliveryController::class, 'assignDriver'])->middleware('permission:orders.view')->name('orders.assign_driver');
     });
 
     /*

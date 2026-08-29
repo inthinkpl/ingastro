@@ -75,7 +75,7 @@ const handleDeleteProduct = (id) => {
             <!-- NAGŁÓWEK -->
             <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-4">
                 <div class="flex items-center space-x-3">
-                    <div class="h-10 w-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+                    <div class="h-10 w-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
                         <Pizza class="w-6 h-6" />
                     </div>
                     <div>
