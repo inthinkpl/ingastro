@@ -101,16 +101,22 @@ const removeVariantRow = (index) => {
 
 const handleClose = () => {
     isCustomCategory.value = false;
+    addForm.reset();
+    addForm.clearErrors();
     emit('close');
 };
 
 const submitAdd = () => {
     addForm.post(route('manager.products.store'), {
         preserveScroll: true,
+        forceFormData: true, // 👈 KLUCZOWE: Wymusza poprawne przesyłanie plików i tablic
         onSuccess: () => {
             isCustomCategory.value = false;
             addForm.reset();
             emit('close');
+        },
+        onError: (errors) => {
+            console.error('Błędy zapisywania produktu:', errors);
         }
     });
 };
@@ -168,6 +174,7 @@ const submitAdd = () => {
                         class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2.5 text-white font-medium focus:border-red-500" 
                         required 
                     />
+                    <span v-if="addForm.errors.category" class="text-red-400 block mt-1">{{ addForm.errors.category }}</span>
                 </div>
 
                 <!-- WARIANTY ROZMIARÓW I CEN -->
@@ -217,6 +224,8 @@ const submitAdd = () => {
                         </div>
                     </div>
 
+                    <span v-if="addForm.errors.variants" class="text-red-400 block mt-1">{{ addForm.errors.variants }}</span>
+
                     <button 
                         type="button" 
                         @click="addVariantRow" 
@@ -231,6 +240,7 @@ const submitAdd = () => {
                 <div>
                     <label class="block font-bold text-slate-400 uppercase mb-1">Opis dania</label>
                     <textarea v-model="addForm.description" rows="2" placeholder="Składniki, opis na stronę..." class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2.5 text-white font-medium focus:border-red-500"></textarea>
+                    <span v-if="addForm.errors.description" class="text-red-400 block mt-1">{{ addForm.errors.description }}</span>
                 </div>
 
                 <!-- ZDJĘCIE -->
@@ -239,7 +249,13 @@ const submitAdd = () => {
                         <Upload class="w-3.5 h-3.5 text-amber-500" />
                         <span>Zdjęcie potrawy</span>
                     </label>
-                    <input type="file" @input="addForm.image = $event.target.files[0]" class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2 text-white font-medium focus:border-red-500" accept="image/*" />
+                    <input 
+    type="file" 
+    @change="e => addForm.image = e.target.files[0]" 
+    class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2 text-white font-medium focus:border-red-500" 
+    accept="image/*" 
+/>
+                    <span v-if="addForm.errors.image" class="text-red-400 block mt-1">{{ addForm.errors.image }}</span>
                 </div>
 
                 <!-- AKTYWNY -->

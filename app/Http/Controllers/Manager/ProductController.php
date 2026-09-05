@@ -13,14 +13,12 @@ use Inertia\Inertia;
 class ProductController extends Controller
 {
     /**
-     * Wyświetla listę produktów w panelu managera.
+     * Wyświetla listę wszystkich produktów (aktywnych i ukrytych) w panelu managera.
      */
     public function index()
     {
-        // Pobieramy produkty z ich wariantami oraz surowcami i wagą z pivota (amount_needed)
-        $products = Product::where('is_active', true)
-            ->with(['variants' => function($query) {
-                $query->where('is_active', true); // Pobieramy aktywne warianty
+        $products = Product::with(['variants' => function($query) {
+                $query->where('is_active', true);
             }, 'variants.ingredients' => function($query) {
                 $query->select('ingredients.id', 'ingredients.name', 'ingredients.unit')
                       ->withPivot('amount_needed');
@@ -28,10 +26,7 @@ class ProductController extends Controller
             ->orderBy('category')
             ->get();
 
-        // Pobieramy wszystkie surowce z magazynu do listy wyboru we Vue
         $ingredients = Ingredient::orderBy('name', 'asc')->get();
-
-        // Pobieramy istniejące unikalne kategorie produktów dla filtrowania i podpowiedzi w modalach
         $categories = Product::distinct()->pluck('category')->filter()->values()->all();
 
         return Inertia::render('Manager/Products', [
@@ -42,127 +37,147 @@ class ProductController extends Controller
     }
 
     /**
-     * Zapisuje nowy produkt w bazie danych wraz ze zdjęciem i wariantami.
+     * Zapisuje nowy produkt wraz ze zdjęciem i wariantami w bazie danych.
      */
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'name'                 => 'required|string|max:255|unique:products,name',
-            'category'             => 'required|string|max:100',
-            'description'          => 'nullable|string|max:1000',
-            'image'                => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
-            'is_active'            => 'required|boolean',
-            'variants'             => 'required|array|min:1',
-            'variants.*.size_name' => 'required|string|max:255',
-            'variants.*.price'     => 'required|numeric|min:0',
+   public function store(Request $request)
+{
+    // Jeśli warianty zostały przesłane jako ciąg tekstu przez FormData, dekodujemy je do tablicy
+    if (is_string($request->variants)) {
+        $request->merge([
+            'variants' => json_decode($request->variants, true)
         ]);
-
-        if ($request->hasFile('image')) {
-            $validated['image_path'] = $request->file('image')->store('products', 'public');
-        }
-
-        // 1. Zapis produktu głównego
-        $product = Product::create([
-            'name'        => $validated['name'],
-            'category'    => $validated['category'],
-            'description' => $validated['description'] ?? null,
-            'image_path'  => $validated['image_path'] ?? null,
-            'is_active'   => $validated['is_active'],
-        ]);
-
-        // 2. Zapis przypisanych wariantów (domyślnie is_active = true)
-        foreach ($validated['variants'] as $v) {
-            $product->variants()->create([
-                'size_name' => $v['size_name'],
-                'price'     => $v['price'],
-                'is_active' => true,
-            ]);
-        }
-
-        return redirect()->back()->with('success', 'Nowy produkt wraz z wariantami został pomyślnie dodany do karty dań!');
     }
 
+    $validated = $request->validate([
+        'name'                 => 'required|string|max:255|unique:products,name',
+        'category'             => 'required|string|max:100',
+        'description'          => 'nullable|string|max:1000',
+        'image'                => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240', // Do 10MB
+        'is_active'            => 'nullable|boolean',
+        'variants'             => 'required|array|min:1',
+        'variants.*.size_name' => 'required|string|max:255',
+        'variants.*.price'     => 'required|numeric|min:0',
+    ]);
+
+    if ($request->hasFile('image')) {
+        $validated['image_path'] = $request->file('image')->store('products', 'public');
+    }
+
+    $product = Product::create([
+        'name'        => $validated['name'],
+        'category'    => $validated['category'],
+        'description' => $validated['description'] ?? null,
+        'image_path'  => $validated['image_path'] ?? null,
+        'is_active'   => $validated['is_active'] ?? true,
+    ]);
+
+    foreach ($validated['variants'] as $v) {
+        $product->variants()->create([
+            'size_name' => $v['size_name'],
+            'price'     => $v['price'],
+            'is_active' => true,
+        ]);
+    }
+
+    return redirect()->back()->with('success', 'Nowy produkt wraz z wariantami i zdjęciem został pomyślnie dodany!');
+}
+
     /**
-     * Aktualizuje dane istniejącego produktu oraz jego warianty.
+     * Aktualizuje dane istniejącego produktu oraz jego warianty (w tym zmianę statusu is_active).
      */
     public function update(Request $request, Product $product)
-    {
-        $validated = $request->validate([
-            'name'                 => 'required|string|max:255|unique:products,name,' . $product->id,
-            'category'             => 'required|string|max:100',
-            'description'          => 'nullable|string|max:1000',
-            'image'                => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
-            'is_active'            => 'required|boolean',
-            'variants'             => 'nullable|array',
-            'variants.*.id'        => 'nullable|exists:product_variants,id',
-            'variants.*.size_name' => 'required_with:variants|string|max:255',
-            'variants.*.price'     => 'required_with:variants|numeric|min:0',
+{
+    // Jeśli warianty przyszły jako ciąg JSON przez FormData
+    if (is_string($request->variants)) {
+        $request->merge([
+            'variants' => json_decode($request->variants, true)
         ]);
+    }
 
-        if ($request->hasFile('image')) {
-            if ($product->image_path) {
-                Storage::disk('public')->delete($product->image_path);
-            }
-            $validated['image_path'] = $request->file('image')->store('products', 'public');
+    $validated = $request->validate([
+        'name'                 => 'required|string|max:255|unique:products,name,' . $product->id,
+        'category'             => 'required|string|max:100',
+        'description'          => 'nullable|string|max:1000',
+        'image'                => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240',
+        'is_active'            => 'required|boolean',
+        'variants'             => 'nullable|array',
+        'variants.*.id'        => 'nullable|exists:product_variants,id',
+        'variants.*.size_name' => 'required_with:variants|string|max:255',
+        'variants.*.price'     => 'required_with:variants|numeric|min:0',
+    ]);
+
+    if ($request->hasFile('image')) {
+        if ($product->image_path) {
+            Storage::disk('public')->delete($product->image_path);
         }
+        $validated['image_path'] = $request->file('image')->store('products', 'public');
+    }
 
-        // 1. Aktualizacja danych głównych potrawy
-        $product->update([
-            'name'        => $validated['name'],
-            'category'    => $validated['category'],
-            'description' => $validated['description'] ?? null,
-            'image_path'  => $validated['image_path'] ?? $product->image_path,
-            'is_active'   => $validated['is_active'],
-        ]);
+    $product->update([
+        'name'        => $validated['name'],
+        'category'    => $validated['category'],
+        'description' => $validated['description'] ?? null,
+        'image_path'  => $validated['image_path'] ?? $product->image_path,
+        'is_active'   => $validated['is_active'],
+    ]);
 
-        // 2. Aktualizacja / Dodawanie / Soft-Dezaktywacja wariantów
-        if (isset($validated['variants'])) {
-            $updatedVariantIds = [];
+    if (isset($validated['variants'])) {
+        $updatedVariantIds = [];
 
-            foreach ($validated['variants'] as $v) {
-                if (!empty($v['id'])) {
-                    $variant = $product->variants()->find($v['id']);
-                    if ($variant) {
-                        $variant->update([
-                            'size_name' => $v['size_name'],
-                            'price'     => $v['price'],
-                            'is_active' => true, // Zapewniamy aktywność
-                        ]);
-                        $updatedVariantIds[] = $variant->id;
-                    }
-                } else {
-                    $newVariant = $product->variants()->create([
+        foreach ($validated['variants'] as $v) {
+            if (!empty($v['id'])) {
+                $variant = $product->variants()->find($v['id']);
+                if ($variant) {
+                    $variant->update([
                         'size_name' => $v['size_name'],
                         'price'     => $v['price'],
                         'is_active' => true,
                     ]);
-                    $updatedVariantIds[] = $newVariant->id;
+                    $updatedVariantIds[] = $variant->id;
                 }
+            } else {
+                $newVariant = $product->variants()->create([
+                    'size_name' => $v['size_name'],
+                    'price'     => $v['price'],
+                    'is_active' => true,
+                ]);
+                $updatedVariantIds[] = $newVariant->id;
             }
-
-            // Zamiast kasowania z bazy (co powoduje błąd SQL 23000 w zamówieniach), dezaktywujemy warianty
-            $product->variants()->whereNotIn('id', $updatedVariantIds)->update(['is_active' => false]);
         }
 
-        return redirect()->back()->with('success', 'Dane produktu wraz z wariantami zostały zaktualizowane.');
+        $product->variants()->whereNotIn('id', $updatedVariantIds)->update(['is_active' => false]);
     }
 
+    return redirect()->back()->with('success', 'Dane produktu i zdjęcie zostały zaktualizowane.');
+}
+
     /**
-     * Wyłącza (dezaktywuje) produkt oraz wszystkie jego warianty z karty dań.
+     * Fizycznie usuwa produkt lub wycofuje go ze sklepu, jeśli ma powiązania z zamówieniami.
      */
     public function destroy(Product $product)
     {
-        // 1. Dezaktywujemy sam produkt
-        $product->update(['is_active' => false]);
+        try {
+            // Usuwamy relacje wariantów oraz receptury BOM
+            foreach ($product->variants as $variant) {
+                $variant->ingredients()->detach();
+                $variant->delete();
+            }
 
-        // 2. Dezaktywujemy wszystkie przypisane do niego warianty
-        $product->variants()->update(['is_active' => false]);
+            // Usuwamy produkt główny
+            $product->delete();
 
-        return redirect()->back()->with('success', 'Produkt został pomyślnie wycofany z menu.');
+            return redirect()->back()->with('success', 'Produkt został trwale usunięty z bazy danych.');
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Jeśli produkt istnieje w archiwalnych zamówieniach (SQL 23000), wyłączamy go
+            $product->update(['is_active' => false]);
+            $product->variants()->update(['is_active' => false]);
+
+            return redirect()->back()->with('success', 'Produkt posiada archiwalne zamówienia — został ukryty i wycofany z oferty.');
+        }
     }
 
     /**
-     * Szybkie dodawanie nowego wariantu rozmiarowego z poziomu modalu BOM lub edycji.
+     * Dodawanie nowego wariantu rozmiarowego z poziomu modalu BOM lub edycji.
      */
     public function storeVariant(Request $request, Product $product)
     {
@@ -183,13 +198,11 @@ class ProductController extends Controller
      */
     public function destroyVariant(ProductVariant $variant)
     {
-        // Zabezpieczenie: Produkt musi posiadać przynajmniej 1 aktywny wariant cenowy
         $activeVariantsCount = $variant->product->variants()->where('is_active', true)->count();
         if ($activeVariantsCount <= 1) {
             return redirect()->back()->with('error', 'Błąd: Produkt musi posiadać przynajmniej jeden aktywny wariant cenowy!');
         }
 
-        // Zamiast usuwania z bazy, przełączamy status aktywności
         $variant->update(['is_active' => false]);
 
         return redirect()->back()->with('success', 'Wariant został pomyślnie wyłączony.');
@@ -214,7 +227,6 @@ class ProductController extends Controller
             }
         }
 
-        // Synchronizacja tabeli pivot ingredient_variant
         $variant->ingredients()->sync($syncData);
 
         return redirect()->back()->with('success', 'Receptura BOM dla wariantu została pomyślnie zapisana!');

@@ -13,7 +13,6 @@ const emit = defineEmits(['close']);
 
 const isCustomCategory = ref(false);
 
-// Rozszerzone presety dla wszystkich kategorii
 const VARIANT_PRESETS = {
     'Pizza': [
         { size_name: 'Mała (32cm)', price: 28.00 },
@@ -62,7 +61,6 @@ const editForm = useForm({
     variants: []
 });
 
-// Reakcja na zmianę przekazanego produktu w propsach (napełnienie formularza)
 watch(() => props.product, (newProduct) => {
     if (newProduct) {
         editForm.name = newProduct.name || '';
@@ -71,7 +69,6 @@ watch(() => props.product, (newProduct) => {
         editForm.is_active = Boolean(newProduct.is_active);
         editForm.image = null;
 
-        // Ładowanie istniejących wariantów produktu
         if (newProduct.variants && newProduct.variants.length > 0) {
             editForm.variants = newProduct.variants.map(v => ({
                 id: v.id,
@@ -82,7 +79,6 @@ watch(() => props.product, (newProduct) => {
             editForm.variants = [{ size_name: 'Porcja Standard', price: 0.00 }];
         }
 
-        // Sprawdzamy czy kategoria produktu znajduje się na liście rozwijanej
         if (props.categories && props.categories.length > 0) {
             isCustomCategory.value = !props.categories.includes(newProduct.category);
         } else {
@@ -113,7 +109,6 @@ const addVariantRow = () => {
     editForm.variants.push({ size_name: '', price: 0.00 });
 };
 
-// Usuwanie wariantu bezpośrednio z poziomu modalu
 const removeVariantRow = (index) => {
     const variantToRemove = editForm.variants[index];
 
@@ -122,7 +117,6 @@ const removeVariantRow = (index) => {
         return;
     }
 
-    // Jeśli wariant istnieje już w bazie danych (posiada ID), wysyłamy żądanie DELETE do backendu
     if (variantToRemove && variantToRemove.id) {
         if (confirm(`Czy na pewno chcesz usunąć wariant "${variantToRemove.size_name}"?`)) {
             router.delete(route('manager.products.variants.destroy', variantToRemove.id), {
@@ -133,7 +127,6 @@ const removeVariantRow = (index) => {
             });
         }
     } else {
-        // Jeśli był to nowo dodany wariant w formularzu (brak ID w bazie) - usuwamy z tablicy
         editForm.variants.splice(index, 1);
     }
 };
@@ -145,10 +138,16 @@ const handleClose = () => {
 const submitEdit = () => {
     if (!props.product) return;
 
+    // 👈 DODANO forceFormData: true, aby pliki i złożone struktury wariantów przechodziły przez HTTP POST z _method: PUT
     editForm.post(route('manager.products.update', props.product.id), {
         preserveScroll: true,
+        forceFormData: true,
         onSuccess: () => {
+            editForm.reset();
             emit('close');
+        },
+        onError: (errors) => {
+            console.error('Błędy aktualizacji produktu/zdjęcia:', errors);
         }
     });
 };
@@ -278,7 +277,9 @@ const submitEdit = () => {
                         <Upload class="w-3.5 h-3.5 text-amber-500" />
                         <span>Zmień zdjęcie potrawy (opcjonalnie)</span>
                     </label>
-                    <input type="file" @input="editForm.image = $event.target.files[0]" class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2 text-white font-medium focus:border-red-500" accept="image/*" />
+                    <!-- 👈 UŻYCIE @change ZAMIAST @input ZAPEWNIA POPRAWNE PRZEKAZANIE PLIKU -->
+                    <input type="file" @change="e => editForm.image = e.target.files[0]" class="w-full bg-[#0B0F19] border border-slate-800 rounded-xl p-2 text-white font-medium focus:border-red-500" accept="image/*" />
+                    <span v-if="editForm.errors.image" class="text-red-400 block mt-1">{{ editForm.errors.image }}</span>
                 </div>
 
                 <!-- AKTYWNY -->

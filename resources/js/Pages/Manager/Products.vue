@@ -4,7 +4,7 @@ import { router, Head } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Pizza, Plus, Filter } from 'lucide-vue-next';
 
-// Komponenty cząstkowe
+// Komponenty cząstkowe z resources/js/Pages/Manager/Products/Partials/
 import ProductTable from './Products/Partials/ProductTable.vue';
 import AddProductModal from './Products/Partials/AddProductModal.vue';
 import EditProductModal from './Products/Partials/EditProductModal.vue';
@@ -26,7 +26,7 @@ const categories = computed(() => {
     return [...new Set([...defaultCategories, ...fromProducts])];
 });
 
-// PRZEFILTROWANA LISTA DAŃ PRZEKAZYWANA DO TABELI
+// ZWRACA WSZYSTKIE PRODUKTY (AKTYWNE I UKRYTE) W DANEJ KATEGORII
 const filteredProducts = computed(() => {
     if (selectedCategory.value === 'Wszystko') {
         return props.products;
@@ -58,7 +58,7 @@ const handleOpenRecipeModal = (product) => {
 };
 
 const handleDeleteProduct = (id) => {
-    if (confirm('Czy na pewno chcesz bezpowrotnie usunąć ten produkt oraz wszystkie jego warianty z karty dań?')) {
+    if (confirm('Czy na pewno chcesz usunąć ten produkt z karty dań?')) {
         router.delete(route('manager.products.destroy', id), {
             preserveScroll: true
         });
@@ -138,14 +138,13 @@ const handleDeleteProduct = (id) => {
                 @delete="handleDeleteProduct"
             />
 
-            <!-- MODAL: DODAWANIE PRODUKTU -->
+            <!-- MODALE SKLEPOWE -->
             <AddProductModal 
                 :is-open="isAddModalOpen"
                 :categories="categories"
                 @close="isAddModalOpen = false"
             />
 
-            <!-- MODAL: EDYCJA PRODUKTU -->
             <EditProductModal 
                 :is-open="isEditModalOpen"
                 :product="activeSelectedProduct"
@@ -153,7 +152,6 @@ const handleDeleteProduct = (id) => {
                 @close="isEditModalOpen = false"
             />
 
-            <!-- MODAL: KONFIGURATOR RECEPTUR BOM -->
             <BomRecipeModal 
                 :is-open="isRecipeModalOpen"
                 :product="activeSelectedProduct"
