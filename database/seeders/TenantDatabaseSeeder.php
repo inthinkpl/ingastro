@@ -14,60 +14,64 @@ class TenantDatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Składniki w magazynie lokalu
-        $cheese = Ingredient::create([
-            'name' => 'Ser Mozzarella',
-            'unit' => 'kg',
-            'stock_main' => 10.000,
-            'stock_local' => 5.000,
-            'min_stock_local' => 2.000,
-            'purchase_price' => 25.00, // 👈 Jawnie przekazujemy cenę zakupu
-        ]);
+        $tenantDomain = tenant('id') ?? 'savona';
 
-        $sauce = Ingredient::create([
-            'name' => 'Sos Pomidorowy',
-            'unit' => 'l',
-            'stock_main' => 15.000,
-            'stock_local' => 8.000,
-            'min_stock_local' => 3.000,
-            'purchase_price' => 8.00, // 👈 Jawnie przekazujemy cenę zakupu
-        ]);
+        // 1. Składniki w magazynie lokalu (używamy firstOrCreate, żeby nie tworzyć duplikatów)
+        $cheese = Ingredient::firstOrCreate(
+            ['name' => 'Ser Mozzarella'],
+            [
+                'unit' => 'kg',
+                'stock_main' => 10.000,
+                'stock_local' => 5.000,
+                'min_stock_local' => 2.000,
+                'purchase_price' => 25.00,
+            ]
+        );
+
+        $sauce = Ingredient::firstOrCreate(
+            ['name' => 'Sos Pomidorowy'],
+            [
+                'unit' => 'l',
+                'stock_main' => 15.000,
+                'stock_local' => 8.000,
+                'min_stock_local' => 3.000,
+                'purchase_price' => 8.00,
+            ]
+        );
 
         // 2. Produkt (Pizza Margherita)
-        $pizza = Product::create([
-            'name' => 'Pizza Margherita',
-            'category' => 'pizza',
-        ]);
+        $pizza = Product::firstOrCreate(
+            ['name' => 'Pizza Margherita'],
+            ['category' => 'pizza']
+        );
 
         // 3. Warianty (Rozmiary)
-        $variantSmall = ProductVariant::create([
-            'product_id' => $pizza->id,
-            'size_name' => 'Mała (32cm)',
-            'price' => 29.99,
-        ]);
+        $variantSmall = ProductVariant::firstOrCreate(
+            ['product_id' => $pizza->id, 'size_name' => 'Mała (32cm)'],
+            ['price' => 29.99]
+        );
 
-        $variantBig = ProductVariant::create([
-            'product_id' => $pizza->id,
-            'size_name' => 'Duża (42cm)',
-            'price' => 39.99,
-        ]);
+        $variantBig = ProductVariant::firstOrCreate(
+            ['product_id' => $pizza->id, 'size_name' => 'Duża (42cm)'],
+            ['price' => 39.99]
+        );
 
-        // 4. Receptury BOM
-        $variantSmall->ingredients()->attach([
+        // 4. Receptury BOM (sync zamiast attach zapobiega błędom powiązań przy ponownym seedowaniu)
+        $variantSmall->ingredients()->sync([
             $cheese->id => ['amount_needed' => 0.150],
             $sauce->id => ['amount_needed' => 0.100],
         ]);
 
-        $variantBig->ingredients()->attach([
+        $variantBig->ingredients()->sync([
             $cheese->id => ['amount_needed' => 0.250],
             $sauce->id => ['amount_needed' => 0.150],
         ]);
 
-        // 5. Konta personelu lokalu
-        $tenantDomain = tenant('id') ?? 'savona';
+        // 5. Konta personelu lokalu (dopasowane do realnej domeny tenanta)
+        $domainSuffix = tenant()->domains()->first()?->domain ?? ($tenantDomain . '.ingastro.pl');
 
         User::firstOrCreate(
-            ['email' => 'admin@' . $tenantDomain . '.localhost'],
+            ['email' => 'admin@' . $tenantDomain . '.pl'],
             [
                 'name' => 'Jan Admin',
                 'password' => Hash::make('password'),
@@ -76,7 +80,7 @@ class TenantDatabaseSeeder extends Seeder
         );
 
         User::firstOrCreate(
-            ['email' => 'manager@' . $tenantDomain . '.localhost'],
+            ['email' => 'manager@' . $tenantDomain . '.pl'],
             [
                 'name' => 'Marek Manager',
                 'password' => Hash::make('password'),
@@ -85,7 +89,7 @@ class TenantDatabaseSeeder extends Seeder
         );
 
         User::firstOrCreate(
-            ['email' => 'chef@' . $tenantDomain . '.localhost'],
+            ['email' => 'chef@' . $tenantDomain . '.pl'],
             [
                 'name' => 'Krzysztof Kucharz',
                 'password' => Hash::make('password'),

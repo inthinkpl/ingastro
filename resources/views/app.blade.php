@@ -11,7 +11,7 @@
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
         <script>
-                window.customAppName = "{{ \App\Models\SystemSetting::get('restaurant_name', 'Pizzeria Savona') }}";
+                window.customAppName = "{{ config('app.name', 'InGastro SaaS') }}";
         </script>
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
