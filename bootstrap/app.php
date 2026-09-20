@@ -11,11 +11,18 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Rejestracja aliasów middleware dla ról, uprawnień i modułów
+        // 🔓 Ustawienie dozwolonych hostów dla sesji i zapytań cross-origin (CORS)
+        $middleware->trustHosts(at: ['localhost', '127.0.0.1', '.*\.localhost']);
+
+        // 🛡️ Włączamy obsługę domen stanowych (Sanctum / Inertia) dla subdomen .localhost
+        $middleware->statefulApi();
+
+        // Rejestracja aliasów middleware dla ról, uprawnień, modułów oraz planów subskrypcji
         $middleware->alias([
             'role'             => \App\Http\Middleware\RoleMiddleware::class,
             'permission'       => \App\Http\Middleware\CheckPermission::class,
-            'ecommerce.active' => \App\Http\Middleware\EnsureEcommerceIsActive::class, // Moduł wyłączania e-commerce
+            'ecommerce.active' => \App\Http\Middleware\EnsureEcommerceIsActive::class,
+            'feature'          => \App\Http\Middleware\EnsureFeatureEnabled::class,
         ]);
 
         $middleware->web(append: [

@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use Inertia\Middleware;
 use App\Models\SystemSetting; 
 use App\Models\RolePermission;
-use App\Models\WorkShift; // 🔥 Zaimportowany model zmian RCP
+use App\Models\WorkShift;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -22,57 +22,94 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        // 1. DYNAMICZNY ODCZYT: Pobieramy dane z bazy za pomocą Twojej metody EAV
-        $restaurantName    = SystemSetting::get('restaurant_name', 'Pizzeria Savona');
-        $restaurantPhone   = SystemSetting::get('restaurant_phone', '');
-        $restaurantAddress = SystemSetting::get('restaurant_address', '');
+        $restaurantName    = 'Pizzeria Savona';
+        $restaurantPhone   = '';
+        $restaurantAddress = '';
 
-        // 2. GLOBALNE NADPISANIE: Zmieniamy nazwę aplikacji w konfiguracji Laravel w locie.
+        // 🛡️ Bezpieczne pobieranie ustawień lokalu (chroni przed błędami podczas auth/login)
+        try {
+            if (function_exists('tenant') && tenant()) {
+                $restaurantName    = SystemSetting::get('restaurant_name', 'Pizzeria Savona');
+                $restaurantPhone   = SystemSetting::get('restaurant_phone', '');
+                $restaurantAddress = SystemSetting::get('restaurant_address', '');
+            }
+        } catch (\Throwable $e) {
+            // W razie braku tabeli lub błędu bazy używamy wartości domyślnych
+        }
+
         config(['app.name' => $restaurantName]);
 
-        // 3. 🔐 DYNAMICZNA MACIERZ UPRAWNIEŃ ORAZ STATUS RCP ZALOGOWANEGO UŻYTKOWNIKA
+        // 💳 PEŁNE DANE SUBSKRYPCJI TENANTA
+        $tenantFeatures = [];
+        $subscriptionInfo = [
+            'plan_name' => 'Brak Planu',
+            'ends_at'   => 'Bezterminowo',
+            'status'    => 'expired',
+        ];
+
+        try {
+            $tenant = function_exists('tenant') ? tenant() : null;
+            if ($tenant) {
+                $tenant->loadMissing('plan');
+                if ($tenant->subscription_status === 'active' && $tenant->plan) {
+                    $tenantFeatures = $tenant->plan->features ?? [];
+                }
+
+                $endsAt = 'Bezterminowo';
+                if ($tenant->subscription_ends_at) {
+                    $endsAt = is_string($tenant->subscription_ends_at)
+                        ? $tenant->subscription_ends_at
+                        : $tenant->subscription_ends_at->format('Y-m-d');
+                }
+
+                $subscriptionInfo = [
+                    'plan_name' => $tenant->plan?->name ?? 'Brak planu',
+                    'ends_at'   => $endsAt,
+                    'status'    => $tenant->subscription_status ?? 'expired',
+                ];
+            }
+        } catch (\Throwable $e) {
+            // Ignorujemy błąd pobierania subskrypcji na czas zapytania /login
+        }
+
         $user = $request->user();
         $permissions = [];
         $activeShift = null;
 
         if ($user) {
-            // Pobranie aktywnej zmiany roboczej (status 'working' lub 'on_break')
-            $activeShift = WorkShift::where('user_id', $user->id)
-                ->whereIn('status', ['working', 'on_break'])
-                ->latest('clock_in')
-                ->first();
+            try {
+                $activeShift = WorkShift::where('user_id', $user->id)
+                    ->whereIn('status', ['working', 'on_break'])
+                    ->latest('clock_in')
+                    ->first();
 
-            if ($user->role === 'admin') {
-                // Administrator ma gwiazdkę (*) – pełny dostęp do wszystkich modułów
-                $permissions = ['*'];
-            } else {
-                // Dla pozostałych ról pobieramy ich aktywne uprawnienia z bazy
-                $permissions = RolePermission::where('role', $user->role)
-                    ->pluck('permission')
-                    ->toArray();
+                if (isset($user->role) && $user->role === 'admin') {
+                    $permissions = ['*'];
+                } else {
+                    $permissions = RolePermission::where('role', $user->role ?? '')
+                        ->pluck('permission')
+                        ->toArray();
+                }
+            } catch (\Throwable $e) {
+                $permissions = [];
             }
         }
 
         return array_merge(parent::share($request), [
-            // 🔥 Wstrzyknięcie danych autoryzacji z rolą, listą uprawnień i aktywną zmianą RCP
             'auth' => [
-                'user'         => $user,
-                'role'         => $user?->role,
-                'permissions'  => $permissions,
-                'active_shift' => $activeShift, // 👈 Przekazanie aktywnej zmiany do Vue
+                'user'            => $user,
+                'role'            => $user?->role,
+                'permissions'     => $permissions,
+                'active_shift'    => $activeShift,
+                'tenant_features' => $tenantFeatures,
             ],
-
-            // Wstrzyknięcie do globalnych propsów Inertii pod layouty i paski menu
+            // 🍕 DANE LOKALU ORAZ SUBSKRYPCJI
             'restaurant' => [
-                'name'    => $restaurantName,
-                'address' => $restaurantAddress,
-                'phone'   => $restaurantPhone,
+                'name'         => $restaurantName,
+                'address'      => $restaurantAddress,
+                'phone'        => $restaurantPhone,
+                'subscription' => $subscriptionInfo,
             ],
-
-            'errors' => fn () => $request->session()->get('errors', [], function ($value) {
-                return (object) $value;
-            }),
-
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error'   => fn () => $request->session()->get('error'),

@@ -1,0 +1,6 @@
+Krok 4: Wpis w Cronie na serwerze produkcyjnym
+Na serwerze produkcyjnym (VPS / Linux) dodaj pojedynczy wpis do tabeli Crona (crontab -e):
+
+Fragment kodu
+* * * * * cd /sciezka/do/twojego/projektu && php artisan schedule:run >> /dev/null 2>&1
+Gdy Scheduler napotka lokal z minioną datą wygaśnięcia, automatycznie przełączy jego status na expired, co natychmiast zablokuje dostęp do płatnych modułów (POS, KDS, Magazyn BOM itd.) w bocznym menu AuthenticatedLayout.vue.

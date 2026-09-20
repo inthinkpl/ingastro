@@ -10,6 +10,8 @@ use Inertia\Inertia;
 use App\Models\DiscountCode;
 use App\Models\RolePermission;
 use App\Http\Controllers\Admin\RolePermissionController;
+use Illuminate\Support\Carbon;
+use App\Models\SubscriptionInvoice;
 
 class SettingsController extends Controller
 {
@@ -21,6 +23,47 @@ class SettingsController extends Controller
         $savedPermissions = RolePermission::all()->groupBy('role')->map(function ($group) {
             return $group->pluck('permission')->toArray();
         });
+
+        // 💳 Informacje o planie subskrypcji oraz historii faktur z bazy centralnej
+        $tenant = tenant();
+        $subscriptionInfo = null;
+
+        if ($tenant) {
+            $tenant->load('plan');
+
+            // 🛡️ Bezpieczne formatowanie daty wygaśnięcia subskrypcji
+            $endsAtFormatted = 'Bezterminowo';
+            if ($tenant->subscription_ends_at) {
+                if ($tenant->subscription_ends_at instanceof \DateTimeInterface) {
+                    $endsAtFormatted = $tenant->subscription_ends_at->format('Y-m-d');
+                } else {
+                    $endsAtFormatted = Carbon::parse($tenant->subscription_ends_at)->format('Y-m-d');
+                }
+            }
+
+            // 📄 Pobranie historii faktur z bazy centralnej
+            $invoices = SubscriptionInvoice::where('tenant_id', $tenant->id)
+                ->latest('paid_at')
+                ->get()
+                ->map(fn($inv) => [
+                    'id'           => $inv->id,
+                    'number'       => $inv->number,
+                    'plan_name'    => $inv->plan_name,
+                    'amount_gross' => $inv->amount_gross,
+                    'paid_at'      => $inv->paid_at ? $inv->paid_at->format('Y-m-d H:i') : '',
+                    'status'       => $inv->status,
+                ]);
+
+            $subscriptionInfo = [
+                'plan_name'      => $tenant->plan?->name ?? 'Brak planu (Starter)',
+                'price_monthly'  => $tenant->plan?->price_monthly ?? 0,
+                'status'         => $tenant->subscription_status ?? 'active',
+                'ends_at'        => $endsAtFormatted,
+                'features'       => $tenant->plan?->features ?? ['shop', 'pos'],
+                'max_menu_items' => $tenant->plan?->max_menu_items ?? 30,
+                'invoices'       => $invoices, // 👈 Przekazanie listy faktur do widoku Vue
+            ];
+        }
 
         return Inertia::render('Admin/Settings', [
             'restaurantName'        => SystemSetting::get('restaurant_name', 'Pizzeria Savona'),
@@ -52,6 +95,9 @@ class SettingsController extends Controller
             'availablePermissions'  => RolePermissionController::getAvailablePermissions(),
             'rolePermissions'       => $savedPermissions,
             'authRole'              => $request->user()->role,
+
+            // 💳 Przypisanie subskrypcji dla widoku Vue
+            'subscription'          => $subscriptionInfo,
         ]);
     }
 

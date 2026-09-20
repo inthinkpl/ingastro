@@ -23,9 +23,10 @@ const form = useForm({
 });
 
 const submit = () => {
-    form.post(route('login'), {
+    // 🛡️ Bezpośrednio przekazujemy ciąg znaków '/login' do form.post (BEZ wywołania route())
+    form.post('/login', {
         onFinish: () => form.reset('password'),
-    });
+});
 };
 </script>
 

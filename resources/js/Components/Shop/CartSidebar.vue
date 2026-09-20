@@ -123,28 +123,34 @@ const loyaltyMessage = ref('');
 const isSendingOtp = ref(false);
 const isVerifyingOtp = ref(false);
 
-onMounted(async () => {
-    try {
-        const res = await axios.post(route('loyalty.check'), { phone: '' });
-        if (res.data.earn_rate) earnRate.value = parseFloat(res.data.earn_rate);
-    } catch (e) {}
+// Bezpieczny montaż bez wysyłania pustego zapytania wywołującego 422
+onMounted(() => {
+    if (form.phone && form.phone.replace(/\D/g, '').length >= 9) {
+        checkPhoneLoyalty(form.phone);
+    }
 });
 
 const pointsToEarn = computed(() => Math.floor(cartTotal.value * earnRate.value));
 
-watch(() => form.phone, async (newPhone) => {
-    if (newPhone && newPhone.length >= 9) {
-        try {
-            const res = await axios.post(route('loyalty.check'), { phone: newPhone });
-            isLoyaltyEligible.value = res.data.eligible;
-            if (res.data.earn_rate) earnRate.value = parseFloat(res.data.earn_rate);
-        } catch (e) {
-            isLoyaltyEligible.value = false;
-        }
-    } else {
+const checkPhoneLoyalty = async (phoneVal) => {
+    const cleaned = (phoneVal || '').replace(/\D/g, '');
+    if (cleaned.length < 9) {
         isLoyaltyEligible.value = false;
         showOtpInput.value = false;
+        return;
     }
+
+    try {
+        const res = await axios.post(route('loyalty.check'), { phone: phoneVal });
+        isLoyaltyEligible.value = res.data.eligible;
+        if (res.data.earn_rate) earnRate.value = parseFloat(res.data.earn_rate);
+    } catch (e) {
+        isLoyaltyEligible.value = false;
+    }
+};
+
+watch(() => form.phone, (newPhone) => {
+    checkPhoneLoyalty(newPhone);
 });
 
 const handleSendOtp = async () => {
@@ -252,11 +258,9 @@ const checkout = () => {
 
     form.post(route('order.store'), {
         onSuccess: () => {
-            // Czyszczenie pamięci przeglądarki oraz powiadomienie nadrzędnego komponentu
             localStorage.removeItem('savona_cart');
             emit('clear-cart');
 
-            // Reset pól formularza oraz dodatkowych wartości
             form.reset('delivery_address', 'discount_code', 'phone', 'loyalty_discount');
             appliedDiscount.value = null;
             discountCodeInput.value = '';
