@@ -10,9 +10,9 @@ export default defineConfig({
         VitePWA({
             registerType: 'autoUpdate',
             manifest: {
-                name: 'Pizzeria Savona',
-                short_name: 'Savona',
-                description: 'Zamawiaj ulubioną pizzę z dostawą w Pizzerii Savona',
+                name: 'Ingastro.pl',
+                short_name: 'ingastro',
+                description: 'Zamawiaj ulubione dania z ingastro',
                 theme_color: '#e11d48',
                 background_color: '#ffffff',
                 display: 'standalone',

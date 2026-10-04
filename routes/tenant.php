@@ -34,6 +34,7 @@ use App\Http\Controllers\BomController;
 use App\Http\Controllers\Manager\PromotionController;
 use App\Http\Controllers\Central\CentralSubscriptionController;
 use App\Http\Controllers\Central\SubscriptionInvoiceController;
+use App\Http\Controllers\SubscriptionController;
 
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
@@ -107,7 +108,7 @@ Route::middleware([
             Route::get('/simulation/{order}', [PaymentController::class, 'simulationView'])->name('payment.simulation.view');
             Route::post('/simulation/{order}/confirm', [PaymentController::class, 'simulationConfirm'])->name('payment.simulation.confirm');
 
-            // Zunifikowany produkcyjny Webhook (Dla PayU, Tpay oraz automatyzacji procesów w tle)
+            // Zunifikowany produkcyjny Webhook
             Route::post('/webhook', [PaymentController::class, 'webhook'])->name('payment.webhook');
             Route::post('/payu/webhook', [\App\Services\Payment\drivers\PayUDriver::class, 'verify'])->name('payment.payu.webhook');
 
@@ -128,8 +129,15 @@ Route::middleware([
         /*
          * ─── 💳 INICJALIZACJA PŁATNOŚCI ZA SUBSKRYPCJĘ SAAS DLA TENANTA ───
          */
-        Route::middleware(['role:admin'])->prefix('tenant')->name('tenant.')->group(function () {
-            Route::post('/subscription/checkout', [CentralSubscriptionController::class, 'checkoutStripe'])->name('subscription.checkout');
+        Route::middleware(['role:admin'])->group(function () {
+            // 1. Trasa GET dla kliknięć w banerze i bezpośrednich nawigacji
+            Route::get('/subscription/checkout/{planId}', [SubscriptionController::class, 'checkout'])->name('subscription.checkout');
+            
+            // 2. Trasa POST dla zapytań Axios/AJAX
+            Route::post('/subscription/checkout', [CentralSubscriptionController::class, 'checkoutStripe'])->name('subscription.checkout.post');
+            
+            // 3. Aliasy wstecznej kompatybilności
+            Route::post('/tenant/subscription/checkout', [CentralSubscriptionController::class, 'checkoutStripe'])->name('tenant.subscription.checkout');
         });
 
         /*
@@ -142,7 +150,7 @@ Route::middleware([
         });
 
         /*
-         * ─── MODUŁ ADMINISTRATORA I USTAWIEŃ GLOBALNYCH (Dostęp: Admin + Manager / Zabezpieczenie RBAC) ───
+         * ─── MODUŁ ADMINISTRATORA I USTAWIEŃ GLOBALNYCH ───
          */
         Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
             Route::get('/orders', [OrderAdminController::class, 'index'])->middleware('permission:orders.view')->name('orders.index');
@@ -154,7 +162,7 @@ Route::middleware([
             // 📄 Pobieranie Faktury Subskrypcyjnej PDF
             Route::get('/subscription/invoice/{invoice}/download', [SubscriptionInvoiceController::class, 'download'])->name('subscription.invoice.download');
 
-            // ⏱️ Rejestracja Czasu Pracy (RCP) - Panel Ewidencji i Korekt (Wymaga feature:rcp)
+            // ⏱️ Rejestracja Czasu Pracy (RCP)
             Route::middleware(['feature:rcp'])->group(function () {
                 Route::get('/rcp', [RcpController::class, 'index'])->middleware('permission:rcp.view')->name('rcp.index');
                 Route::post('/rcp', [RcpController::class, 'store'])->middleware('permission:rcp.view')->name('rcp.store');
@@ -166,10 +174,10 @@ Route::middleware([
             Route::post('/settings', [SettingsController::class, 'save'])->middleware('permission:settings.general')->name('settings.save');
             Route::put('/settings/notifications', [SettingsController::class, 'updateNotifications'])->middleware('permission:settings.general')->name('settings.notifications.update');
 
-            // 🔐 Zapis Macierzy Uprawnień Ról (oraz UserController dla zapisu z poziomu /admin/permissions)
+            // 🔐 Zapis Macierzy Uprawnień Ról
             Route::post('/permissions', [UserController::class, 'updatePermissions'])->name('permissions.update');
 
-            // 👥 Zarządzanie Zespołem (Zabezpieczone RBAC)
+            // 👥 Zarządzanie Zespołem
             Route::middleware('permission:users.manage')->group(function () {
                 Route::get('/users', [UserController::class, 'index'])->name('users.index');
                 Route::post('/users', [UserController::class, 'store'])->name('users.store');
@@ -177,7 +185,7 @@ Route::middleware([
                 Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
             });
 
-            // 🎟️ Trasy Zarządzania Kodami Rabatowymi (Zabezpieczone RBAC)
+            // 🎟️ Trasy Zarządzania Kodami Rabatowymi
             Route::middleware('permission:promotions.manage')->group(function () {
                 Route::post('/discount-codes', [DiscountCodeController::class, 'store'])->name('discount-codes.store');
                 Route::patch('/discount-codes/{discountCode}/toggle', [DiscountCodeController::class, 'toggle'])->name('discount-codes.toggle');
@@ -250,7 +258,7 @@ Route::middleware([
                 Route::delete('/promotions/{promotion}', [PromotionController::class, 'destroy'])->name('promotions.destroy');
             });
 
-            // 🍕 Kreator produktów karty dań i receptury BOM (Receptury BOM wymagają feature:inventory_bom)
+            // 🍕 Kreator produktów karty dań i receptury BOM
             Route::middleware('permission:products.manage')->group(function () {
                 Route::get('/products', [ProductController::class, 'index'])->name('products.index');
                 Route::post('/products', [ProductController::class, 'store'])->name('products.store');
@@ -266,7 +274,7 @@ Route::middleware([
                 });
             });
 
-            // 📦 Gospodarka magazynowa surowców & Przesunięcia MM (Wymaga feature:inventory_bom)
+            // 📦 Gospodarka magazynowa surowców
             Route::middleware(['permission:inventory.manage', 'feature:inventory_bom'])->group(function () {
                 Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory');
                 Route::post('/inventory', [InventoryController::class, 'store'])->name('inventory.store');
@@ -278,20 +286,20 @@ Route::middleware([
                 Route::post('/warehouse/transfer', [WarehouseController::class, 'transfer'])->name('warehouse.transfer');
             });
 
-            // 🎁 Program Lojalnościowy i CRM Klientów (Wymaga feature:loyalty)
+            // 🎁 Program Lojalnościowy i CRM Klientów
             Route::middleware(['permission:loyalty.manage', 'feature:loyalty'])->group(function () {
                 Route::get('/loyalty', [LoyaltyAdminController::class, 'index'])->name('loyalty.index');
                 Route::put('/loyalty/settings', [LoyaltyAdminController::class, 'updateSettings'])->name('loyalty.settings.update');
                 Route::post('/loyalty/customers/{customer}/adjust', [LoyaltyAdminController::class, 'adjustPoints'])->name('loyalty.adjust');
             });
 
-            // 💵 Rozliczanie gotówki kurierów (Wymaga feature:delivery)
+            // 💵 Rozliczanie gotówki kurierów
             Route::middleware(['permission:reconciliation.view', 'feature:delivery'])->group(function () {
                 Route::get('/reconciliation', [DriverDeliveryController::class, 'managerIndex'])->name('reconciliation.index');
                 Route::post('/reconciliation/settle/{driver}', [DriverDeliveryController::class, 'settleDriver'])->name('reconciliation.settle');
             });
 
-            // 🗺️ Zarządzanie strefami dostaw (Wymaga feature:delivery)
+            // 🗺️ Zarządzanie strefami dostaw
             Route::middleware(['permission:delivery_zones.manage', 'feature:delivery'])->group(function () {
                 Route::get('/delivery-zones', [DeliveryZoneController::class, 'index'])->name('delivery_zones.index');
                 Route::post('/delivery-zones', [DeliveryZoneController::class, 'store'])->name('delivery_zones.store');
@@ -303,7 +311,7 @@ Route::middleware([
         });
 
         /*
-         * ─── MODUŁ KUCHNI (CHEF / KDS) (Wymaga feature:kds) ───
+         * ─── MODUŁ KUCHNI (CHEF / KDS) ───
          */
         Route::middleware(['role:chef,admin,manager', 'feature:kds'])->group(function () {
             Route::get('/kds', [OrderController::class, 'kds'])->name('kds.index');
@@ -312,14 +320,14 @@ Route::middleware([
         });
 
         /*
-         * ─── MODUŁ SALI / KASY (STAFF / POS) (Wymaga feature:pos) ───
+         * ─── MODUŁ SALI / KASY (STAFF / POS) ───
          */
         Route::middleware(['role:staff,admin,manager', 'feature:pos'])->prefix('pos')->name('pos.')->group(function () {
             Route::get('/', [OrderController::class, 'pos'])->name('index');
         });
 
         /*
-         * ─── ZABEZPIECZONY SEKTOR KIEROWCÓW (DRIVER) (Wymaga feature:delivery) ───
+         * ─── ZABEZPIECZONY SEKTOR KIEROWCÓW (DRIVER) ───
          */
         Route::middleware(['role:driver,manager,admin', 'feature:delivery'])->prefix('driver')->name('driver.')->group(function () {
             Route::get('/dashboard', [DriverDeliveryController::class, 'index'])->name('dashboard');

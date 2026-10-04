@@ -3,6 +3,7 @@
 use App\Http\Controllers\Central\TenantRegisterController;
 use App\Http\Controllers\Central\CentralAdminController;
 use App\Http\Controllers\Central\CentralSubscriptionController;
+use App\Http\Controllers\SubscriptionController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -26,8 +27,14 @@ foreach ($centralDomains as $domain) {
         Route::get('/register-restaurant', [TenantRegisterController::class, 'create'])->name('central.register');
         Route::post('/register-restaurant', [TenantRegisterController::class, 'store'])->name('central.register.store');
 
-        // 💳 Webhook Stripe (Wyprowadzony poza grupę super-admin)
-        Route::post('/api/webhooks/stripe', [CentralSubscriptionController::class, 'handleStripeWebhook'])->name('central.webhooks.stripe');
+        // 💳 Przekierowanie do Stripe Checkout (z 14-dniowym trialem)
+        Route::get('/subscription/checkout/{plan}', [SubscriptionController::class, 'checkout'])
+            ->middleware(['auth'])
+            ->name('subscription.checkout');
+
+        // 💳 Domyślny Webhook Laravel Cashier / Stripe
+        Route::post('/stripe/webhook', [CentralSubscriptionController::class, 'handleStripeWebhook'])
+            ->name('central.webhooks.stripe');
 
         // 👑 Panel Centralny Super Admina (Central HQ)
         Route::prefix('super-admin')->name('central.admin.')->group(function () {

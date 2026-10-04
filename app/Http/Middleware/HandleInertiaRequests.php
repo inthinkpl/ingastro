@@ -7,6 +7,8 @@ use Inertia\Middleware;
 use App\Models\SystemSetting; 
 use App\Models\RolePermission;
 use App\Models\WorkShift;
+use App\Models\Plan;
+use Illuminate\Support\Carbon;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -25,6 +27,7 @@ class HandleInertiaRequests extends Middleware
         
         $tenantFeatures = [];
         $subscriptionInfo = [
+            'plan_id'   => null,
             'plan_name' => 'Brak Planu',
             'ends_at'   => 'Bezterminowo',
             'status'    => 'expired',
@@ -34,41 +37,77 @@ class HandleInertiaRequests extends Middleware
         $activeShift = null;
         $user = $request->user();
 
-        // 🛡️ WYKONUJEMY TYLKO NA SUBDOMENIE (TENANT)
+        // 🛡️ WYKONUJEMY TYLKO W KONTEKŚCIE TENANTA (SUBDOMENA)
         if (tenant()) {
             
             // Pobieranie ustawień lokalu
             try {
-                $restaurantName    = SystemSetting::get('restaurant_name', 'Pizzeria Savona');
+                $restaurantName    = SystemSetting::get('restaurant_name', 'ingastro');
                 $restaurantPhone   = SystemSetting::get('restaurant_phone', '');
                 $restaurantAddress = SystemSetting::get('restaurant_address', '');
             } catch (\Throwable $e) {}
 
-            // Pobieranie danych subskrypcji
+            // Pobieranie danych subskrypcji i modułów z bazy centralnej
             try {
                 $tenant = tenant();
                 if ($tenant) {
-                    $tenant->loadMissing('plan');
-                    if ($tenant->subscription_status === 'active' && $tenant->plan) {
-                        $tenantFeatures = $tenant->plan->features ?? [];
+                    $status = $tenant->subscription_status ?? 'expired';
+                    
+                    // Weryfikacja daty wygaśnięcia
+                    $endsAtRaw = $tenant->subscription_ends_at ?? $tenant->trial_ends_at ?? null;
+                    $endsAt = 'Bezterminowo';
+
+                    if ($endsAtRaw) {
+                        $endsAtCarbon = $endsAtRaw instanceof \DateTimeInterface 
+                            ? Carbon::instance($endsAtRaw) 
+                            : Carbon::parse($endsAtRaw);
+
+                        $endsAt = $endsAtCarbon->format('Y-m-d');
+
+                        // Jeśli data wygaśnięcia minęła, zmień status na expired
+                        if ($endsAtCarbon->isPast() && $status !== 'active') {
+                            $status = 'expired';
+                        }
                     }
 
-                    $endsAt = 'Bezterminowo';
-                    if ($tenant->subscription_ends_at) {
-                        $endsAt = is_string($tenant->subscription_ends_at)
-                            ? $tenant->subscription_ends_at
-                            : $tenant->subscription_ends_at->format('Y-m-d');
+                    // Sprawdzamy status okresu próbnego
+                    $isOnTrial = in_array($status, ['on_trial', 'trialing'], true);
+                    $isActive = $status === 'active' || $isOnTrial;
+
+                    // 1. POBIERANIE AKTYWNYCH MODUŁÓW (FEATURES)
+                    if ($isActive) {
+                        // Ładujemy plan z bazy centralnej
+                        $plan = $tenant->plan_id ? Plan::on('mysql')->find($tenant->plan_id) : null;
+                        $rawFeatures = $plan?->features ?? [];
+                        
+                        if (is_string($rawFeatures)) {
+                            $rawFeatures = json_decode($rawFeatures, true) ?? [];
+                        }
+
+                        // Jeśli to trial ALBO brak zdefiniowanych funkcji w planie — udostępniamy PEŁNY PAKIET
+                        if ($isOnTrial || empty($rawFeatures)) {
+                            $tenantFeatures = [
+                                'shop', 'pos', 'kds', 'delivery', 
+                                'inventory_bom', 'loyalty', 'rcp', 
+                                'multi_location', 'custom_domain'
+                            ];
+                        } else {
+                            $tenantFeatures = $rawFeatures;
+                        }
                     }
 
                     $subscriptionInfo = [
-                        'plan_name' => $tenant->plan?->name ?? 'Brak planu',
+                        'plan_id'   => $tenant->plan_id ?? 1,
+                        'plan_name' => $plan?->name ?? ($isOnTrial ? 'Pakiet Próbny (14 Dni)' : 'Brak planu'),
                         'ends_at'   => $endsAt,
-                        'status'    => $tenant->subscription_status ?? 'expired',
+                        'status'    => $isOnTrial ? 'trialing' : $status,
                     ];
                 }
-            } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Błąd w middleware HandleInertiaRequests: ' . $e->getMessage());
+            }
 
-            // Pobieranie uprawnień i zmian (shift) tylko w bazie tenanta!
+            // Pobieranie uprawnień i aktywnej zmiany (RCP)
             if ($user) {
                 try {
                     $activeShift = WorkShift::where('user_id', $user->id)
@@ -89,7 +128,7 @@ class HandleInertiaRequests extends Middleware
             }
         }
         
-        // Aktualizacja nazwy aplikacji (dla obu trybów)
+        // Aktualizacja nazwy aplikacji
         config(['app.name' => $restaurantName]);
 
         return array_merge(parent::share($request), [

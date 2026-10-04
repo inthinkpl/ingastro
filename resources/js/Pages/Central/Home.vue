@@ -1,263 +1,370 @@
 <script setup>
+import { ref, computed } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
+import { 
+    Utensils, ShoppingCart, ChefHat, Truck, PackageCheck, 
+    Gift, Clock, CheckCircle2, ArrowRight, ShieldCheck, Sparkles, Zap, Calculator,
+    Building2, Store, Coffee, Pizza, Flame, Check, Monitor, Smartphone, Layers
+} from 'lucide-vue-next';
 
-const features = [
+// Domyślne moduły w ofercie z cenami dla każdego typu gastronomii
+const modules = ref([
+    { key: 'pos', name: 'Kasa POS & Sprzedaż w Lokalu', price: 69, icon: ShoppingCart, desc: 'Szybkie przyjmowanie zamówień przy ladzie i stolikach, bonowanie, wybór sosów, mięs i dodatków.' },
+    { key: 'shop', name: 'Sklep E-Commerce Online', price: 79, icon: Utensils, desc: 'Własny system zamówień online bez prowizji dla Pyszne/Glovo. Twój własny kanał sprzedaży.' },
+    { key: 'kds', name: 'Ekran Kuchenny (KDS)', price: 49, icon: ChefHat, desc: 'Brak papierowych bonów. Kucharze i osoby przy grillu/piecu widzą czas i priorytety zamówień.' },
+    { key: 'delivery', name: 'Moduł & Aplikacja dla Kurierów', price: 59, icon: Truck, desc: 'Nawigacja GPS, przypisywanie stref dostaw i automatyczne rozliczanie gotówki kierowców.' },
+    { key: 'inventory_bom', name: 'Magazyn & Receptury BOM', price: 49, icon: PackageCheck, desc: 'Automatyczne schodzenie surowców ze stanu po każdym sprzedanym daniu, kebabie, pizzie czy napoju.' },
+    { key: 'loyalty', name: 'Program Lojalnościowy & Kody', price: 39, icon: Gift, desc: 'Karty stałego klienta, punkty za zakupy, SMS OTP i automatyczne rabaty powracające.' },
+    { key: 'rcp', name: 'Rejestracja Czasu Pracy (RCP)', price: 29, icon: Clock, desc: 'Ewidencja godzin pracy kelnerów, kucharzy i kurierów, kontrola pauz i wyliczanie wypłat.' },
+]);
+
+// Aktywna zakładka w podglądzie ekranów modułów
+const activePreviewModule = ref('pos');
+
+// Szczegółowe podglądy ekranów modułów
+const modulePreviews = [
     {
-        title: 'Sklep Online & E-Commerce',
-        description: 'Dedykowana strona dla Twojej pizzerii z koszykiem, automatycznymi promocjami i płatnościami online. Bez prowizji od zamówień.',
-        icon: 'shop',
+        key: 'pos',
+        title: 'Kasa POS & Sprzedaż w Lokalu',
+        tagline: 'Niebywale szybkie przyjmowanie zamówień przy ladzie i na stolikach',
+        description: 'Intuicyjny interfejs dotykowy zaprojektowany tak, aby skrócić czas obsługi klienta do minimum. Pozwala na szybkie modyfikacje dań (np. sosy, stopień wysmażenia, składy pizzy), dzielenie rachunków oraz drukowanie bonów i paragonów.',
+        bullets: ['Błyskawiczne modyfikatory dań i dodatków', 'Obsługa stolików i połączenie z terminalem płatniczym', 'Numeracja zamówień do wydawki i wydruk na kuchnię'],
+        badge: 'Terminale & Kasy',
+        image: 'https://images.unsplash.com/photo-1556740758-90de374c12ad?auto=format&fit=crop&w=1200&q=80'
     },
     {
-        title: 'Magazyn & Receptury BOM',
-        description: 'Precyzyjne przeliczanie zużycia składników na podstawie gramatur. Automatyczne zdejmowanie ze stanu przy każdym zamówieniu.',
-        icon: 'inventory',
+        key: 'kds',
+        title: 'Ekran Kuchenny KDS (Kitchen Display System)',
+        tagline: 'Koniec z gubieniem papierowych bonów na kuchni',
+        description: 'Zamówienia z kasy POS i sklepu online natychmiast trafiają na ekrany kucharzy i pizzaiolo. Domyślny timer podświetla dania wymagające natychmiastowej uwagi, co drastycznie skraca czas oczekiwania gości.',
+        bullets: ['Grupowanie dań według sekcji (grill, piec, zimna płyta)', 'Statusy przygotowania w czasie rzeczywistym', 'Sygnał dźwiękowy dla nowych zamówień'],
+        badge: 'Kuchnia & Szef Kuchni',
+        image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=1200&q=80'
     },
     {
-        title: 'System POS & KDS dla Kuchni',
-        description: 'Dotykowy interfejs dla kasjerów oraz ekran KDS dla kucharzy. Zero pomyłek przy realizacji zamówień na sali i w dostawie.',
-        icon: 'pos',
+        key: 'delivery',
+        title: 'Moduł & Aplikacja dla Kurierów',
+        tagline: 'Brak pomyłek w adresach i pełna kontrola nad gotówką',
+        description: 'Aplikacja mobilna dla kierowców pokazuje trasę, nawiguje do klienta i pozwala na szybki kontakt telefoniczny 1 kliknięciem. Menedżer w lokalu widzi pozycję kurierów na mapie oraz rozlicza zebraną gotówkę.',
+        bullets: ['Automatyczne przydzielanie stref dostaw z opłatami', 'Interaktywna mapa i GPS dla kierowców', 'Szybkie rozliczanie zmian i zebranej gotówki'],
+        badge: 'Dostawy & LOGISTYKA',
+        image: 'https://images.unsplash.com/photo-1526367790999-0150786686a2?auto=format&fit=crop&w=1200&q=80'
     },
     {
-        title: 'Moduł Kurierów & Rozliczenia',
-        description: 'Aplikacja dla kierowców, przypisywanie stref dostaw oraz szybkie rozliczanie gotówki na koniec zmiany.',
-        icon: 'delivery',
+        key: 'shop',
+        title: 'Sklep E-Commerce Online (Bez Prowizji)',
+        tagline: 'Własny kanał sprzedaży online z płatnościami',
+        description: 'Zbuduj własną bazę klientów i nie dziel się marżą z portalami dostaw. Twoi klienci zamawiają jedzenie bezpośrednio z Twojej strony internetowej, płacąc online lub przy odbiorze.',
+        bullets: ['Brak prowizji od wartości zamówień', 'Szybka integracja z płatnościami online (PayU / Tpay / Stripe)', 'Dostosowane menu pod urządzenia mobilne'],
+        badge: 'E-Commerce & Zamówienia',
+        image: 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&w=1200&q=80'
     },
     {
+        key: 'inventory_bom',
+        title: 'Magazyn & Receptury BOM (Bill of Materials)',
+        tagline: 'Precyzyjna kontrola zużycia składników i marży dań',
+        description: 'Powiąż produkty w menu z konkretnymi surowcami w magazynie. Sprzedaż kebaba, pizzy czy napoju automatycznie zmniejsza stan sera, mięsa czy sosów w magazynie głównym.',
+        bullets: ['Automatyczny ubytek surowców przy sprzedaży', 'Ostrzeżenia o niskim stanie magazynowym', 'Analiza kosztów dań (Food Cost)'],
+        badge: 'Magazyn & Finanse',
+        image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1200&q=80'
+    },
+    {
+        key: 'rcp',
         title: 'Rejestracja Czasu Pracy (RCP)',
-        description: 'Ewidencja godzin pracy personelu, grafiki oraz pełne wsparcie dla zarządzania zespołem w lokalu.',
-        icon: 'rcp',
-    },
-    {
-        title: 'Analityka BI i Raporty',
-        description: 'Śledź przychody, najpopularniejsze produkty, wartość magazynu i koszty surowców w czasie rzeczywistym.',
-        icon: 'bi',
-    },
+        tagline: 'Ewidencja godzin pracy i sprawne rozliczenia zespołu',
+        description: 'Pracownicy logują rozpoczęcie, przerwy i koniec pracy na dedykowanym widoku w lokalu. Menedżer dostaje gotowe zestawienia do wypłat i uniknie rozbieżności w grafikach.',
+        bullets: ['Osobiste kody PIN dla pracowników', 'Kontrola pauz i nadgodzin', 'Eksport raportów do rozliczeń wypłat'],
+        badge: 'Kadry & Zespół',
+        image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&q=80'
+    }
 ];
 
-const plans = [
-    {
-        name: 'Starter',
-        price: '149',
-        description: 'Dla małych pizzerii i punktów typu Take-away.',
-        features: [
-            'Dedykowana subdomena i sklep online',
-            'System POS do przyjmowania zamówień',
-            'Podstawowy magazyn (do 50 składników)',
-            'Brak prowizji od zamówień',
-            'Wsparcie mailowe 24/7',
-        ],
-        highlighted: false,
-    },
-    {
-        name: 'Pro Gastro',
-        price: '299',
-        description: 'Pełna moc dla rozwijających się restauracji.',
-        features: [
-            'Wszystko co w planie Starter',
-            'Zaawansowany moduł BOM (Receptury)',
-            'Ekran KDS dla Kuchni',
-            'Panel i aplikacja dla Kierowców',
-            'Rejestracja Czasu Pracy (RCP)',
-            'Program Lojalnościowy dla klientów',
-        ],
-        highlighted: true,
-    },
-    {
-        name: 'Enterprise Multi-Lokal',
-        price: '499',
-        description: 'Dla sieci pizzerii i franczyzobiorców.',
-        features: [
-            'Pełna funkcjonalność bez limitów',
-            'Własna domena custom (np. mojapizzeria.pl)',
-            'Wsparcie dla wielu lokalizacji',
-            'Dedykowany opiekun konta',
-            'Integracje API z drukarkami fiskalnymi',
-        ],
-        highlighted: false,
-    },
+const currentPreview = computed(() => {
+    return modulePreviews.find(p => p.key === activePreviewModule.value) || modulePreviews[0];
+});
+
+// Typy lokali gastronomicznych w Polsce
+const venueTypes = [
+    { name: 'Kebab & Fast Food', icon: Flame, desc: 'Szybkie modyfikatory (sosy, mięsa), numery do wydawki, błyskawiczna obsługa kolejki.' },
+    { name: 'Restauracje & Pizzerie', icon: Pizza, desc: 'Pełna obsługa sali, stolików, dzielenie pizzy na pół oraz zarządzanie dostawami.' },
+    { name: 'Kawiarnie, Piekarnie & Burgerownie', icon: Coffee, desc: 'Szybka sprzedaż przy ladzie, nabijanie zestawów i moduł lojalnościowy.' },
+    { name: 'Food Trucki & Multi-Location', icon: Store, desc: 'Mobilny POS oraz centralne zarządzanie menu i magazynem dla wielu punktów.' },
 ];
+
+// Kalkulator dla klienta na stronie głównej
+const selectedKeys = ref(['pos', 'shop', 'kds']);
+
+const toggleModule = (key) => {
+    if (selectedKeys.value.includes(key)) {
+        if (selectedKeys.value.length === 1) return;
+        selectedKeys.value = selectedKeys.value.filter(k => k !== key);
+    } else {
+        selectedKeys.value.push(key);
+    }
+};
+
+const calculatedTotal = computed(() => {
+    return modules.value
+        .filter(m => selectedKeys.value.includes(m.key))
+        .reduce((sum, m) => sum + m.price, 0);
+});
 </script>
 
 <template>
-    <Head title="Savona SaaS - Kompleksowy System POS, Magazyn i E-Commerce dla Pizzerii" />
+    <Head title="InGastro SaaS - Elastyczny System ERP dla Kebaba, Pizzerii i Gastronomii" />
 
-    <div class="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-amber-500 selection:text-slate-950">
-        <!-- Nawigacja -->
-        <header class="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl fixed w-full top-0 z-50">
-            <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+    <div class="min-h-screen bg-slate-50 text-slate-800 font-sans antialiased selection:bg-amber-500 selection:text-white">
+        
+        <!-- PASEK NAWIGACJI -->
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+            <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
                 <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
-                        <svg class="w-6 h-6 text-slate-950" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.25C2.001 21 1.8 20.8 1.8 20.551V12.75c0-.414.336-.75.75-.75h18.9c.414 0 .75.336.75.75v7.801c0 .249-.201.449-.45.449H13.5zM3 12l9-9 9 9" />
-                        </svg>
+                    <div class="p-2.5 bg-amber-500 rounded-xl text-slate-950 font-black shadow-md shadow-amber-500/20">
+                        <Utensils class="w-6 h-6" />
                     </div>
-                    <span class="text-2xl font-black tracking-tight text-white">SAVONA <span class="text-amber-500 text-xs px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 font-mono tracking-wide uppercase">SaaS</span></span>
+                    <span class="text-2xl font-black text-slate-900 tracking-tight">InGastro <span class="text-amber-500">SaaS</span></span>
                 </div>
-                
-                <nav class="hidden md:flex space-x-8 text-sm font-semibold text-slate-400">
-                    <a href="#funkcje" class="hover:text-amber-400 transition">Funkcje</a>
-                    <a href="#cennik" class="hover:text-amber-400 transition">Cennik</a>
-                </nav>
 
                 <div class="flex items-center space-x-4">
-                    <Link 
-                        href="/register-restaurant"
-                        class="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl transition shadow-lg shadow-amber-500/20 text-sm"
-                    >
-                        Uruchom swój lokal
+                    <Link :href="route('central.register')" class="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider transition shadow-md shadow-amber-500/20 flex items-center space-x-2">
+                        <span>Wypróbuj 14 dni za darmo</span>
+                        <ArrowRight class="w-4 h-4" />
                     </Link>
                 </div>
             </div>
         </header>
 
-        <!-- Sekcja Hero -->
-        <section class="pt-40 pb-20 px-6 relative overflow-hidden">
-            <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-500/10 via-transparent to-transparent pointer-events-none"></div>
-            
-            <div class="max-w-5xl mx-auto text-center relative z-10">
-                <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900 border border-slate-800 text-amber-400 text-xs font-semibold uppercase tracking-wider mb-8">
-                    <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-                    <span>Wszystko, czego potrzebuje Twoja pizzeria w jednym miejscu</span>
+        <!-- HERO SECTION Z GRAFIKĄ GASTRONOMICZNĄ -->
+        <section class="max-w-7xl mx-auto px-6 pt-12 pb-16">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                
+                <!-- LEWA STRONA: TEKST -->
+                <div class="lg:col-span-7 space-y-6 text-left">
+                    <div class="inline-flex items-center space-x-2 px-4 py-2 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold uppercase tracking-wider">
+                        <Sparkles class="w-4 h-4 text-amber-600" />
+                        <span>System stworzony dla każdego lokalu gastronomicznego</span>
+                    </div>
+
+                    <h1 class="text-4xl sm:text-6xl font-black text-slate-900 leading-[1.1] tracking-tight">
+                        Nowoczesny system dla całej Gastronomii. <br />
+                        <span class="text-amber-600">
+                            Płacisz tylko za wybrane moduły.
+                        </span>
+                    </h1>
+
+                    <p class="text-slate-600 text-lg sm:text-xl leading-relaxed">
+                        Niezależnie czy prowadzisz popularny punkt z kebabem, lokalną pizzerię, burgerownię czy sieć restauracji – skomponuj idealny zestaw narzędzi bez płacenia prowizji od sprzedaży.
+                    </p>
+
+                    <div class="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                        <Link :href="route('central.register')" class="px-8 py-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-2xl text-base uppercase tracking-wider transition shadow-lg shadow-amber-500/20 flex items-center justify-center space-x-3">
+                            <span>Załóż darmowe konto (14 Dni Trial)</span>
+                            <ArrowRight class="w-5 h-5" />
+                        </Link>
+                    </div>
+
+                    <div class="pt-4 flex flex-wrap items-center gap-6 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        <span class="flex items-center"><ShieldCheck class="w-5 h-5 text-emerald-600 mr-2" /> Bez karty przy rejestracji</span>
+                        <span class="flex items-center"><Zap class="w-5 h-5 text-amber-600 mr-2" /> Konfiguracja w 5 minut</span>
+                        <span class="flex items-center"><CheckCircle2 class="w-5 h-5 text-emerald-600 mr-2" /> 0% prowizji od obrotu</span>
+                    </div>
                 </div>
 
-                <h1 class="text-5xl md:text-7xl font-black text-white tracking-tight leading-tight mb-8">
-                    Zwiększ zyski pizzerii z własnym systemem <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-amber-600">POS i E-Commerce</span>
-                </h1>
-
-                <p class="text-lg md:text-xl text-slate-400 max-w-3xl mx-auto mb-10 leading-relaxed font-normal">
-                    Odrzuć wysokie prowizje portalom dostawczym. Otrzymaj własną stronę do zamawiania online, precyzyjną kontrolę magazynu BOM, panel KDS dla kuchni i aplikację dla kurierów.
-                </p>
-
-                <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                    <Link 
-                        href="/register-restaurant" 
-                        class="group px-8 py-4 bg-amber-500 hover:bg-amber-400 text-slate-950 text-base font-bold rounded-xl transition shadow-xl shadow-amber-500/25 flex items-center justify-center gap-3"
-                    >
-                        <span>Przetestuj za darmo przez 14 dni</span>
-                        <svg class="w-5 h-5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
-                        </svg>
-                    </Link>
-                    <a 
-                        href="#funkcje" 
-                        class="px-8 py-4 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 text-base font-bold rounded-xl transition"
-                    >
-                        Zobacz możliwości
-                    </a>
+                <!-- PRAWA STRONA: ZDJĘCIE HERO GASTRONOMII -->
+                <div class="lg:col-span-5 relative">
+                    <div class="relative mx-auto rounded-3xl overflow-hidden shadow-2xl border-4 border-white bg-slate-100">
+                        <img 
+                            src="https://images.unsplash.com/photo-1556740758-90de374c12ad?auto=format&fit=crop&w=1200&q=80" 
+                            alt="System POS i KDS dla Gastronomii" 
+                            class="w-full h-80 sm:h-96 object-cover"
+                        />
+                        <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent p-6 text-white">
+                            <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Terminal POS & Ekran Kuchni</span>
+                            <h3 class="text-lg font-bold">Pełna kontrola nad czasem wydawania dań</h3>
+                        </div>
+                    </div>
                 </div>
+
             </div>
         </section>
 
-        <!-- Grid Funkcji -->
-        <section id="funkcje" class="py-24 bg-slate-900/40 border-y border-slate-800/60">
-            <div class="max-w-7xl mx-auto px-6">
-                <div class="text-center max-w-3xl mx-auto mb-16">
-                    <h2 class="text-3xl md:text-4xl font-black text-white mb-4">Wszystkie moduły w jednej subskrypcji</h2>
-                    <p class="text-slate-400">Nie musisz płacić oddzielnie za sklep online, system POS i program magazynowy.</p>
+        <!-- TYPY LOKALI W POLSCE -->
+        <section class="bg-white py-16 border-y border-slate-200">
+            <div class="max-w-7xl mx-auto px-6 space-y-10">
+                <div class="text-center space-y-2">
+                    <h2 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Obsługujemy każdy rodzaj lokalu gastronomicznego</h2>
+                    <p class="text-slate-600 text-sm sm:text-base">Od szybkich dań na wynos po pełnowymiarową obsługę kelnerską</p>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    <div 
-                        v-for="item in features" 
-                        :key="item.title"
-                        class="p-8 bg-slate-900/90 border border-slate-800 rounded-2xl hover:border-slate-700 transition group"
-                    >
-                        <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                            <!-- Ikona: Sklep Online -->
-                            <svg v-if="item.icon === 'shop'" class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121 0 2.085-.79 2.29-1.892l1.246-6.697A.75.75 0 0021.525 5H5.111M7.5 14.25L5.111 5" />
-                            </svg>
-                            <!-- Ikona: Magazyn -->
-                            <svg v-else-if="item.icon === 'inventory'" class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                            </svg>
-                            <!-- Ikona: POS & KDS -->
-                            <svg v-else-if="item.icon === 'pos'" class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 20.25h12m-12 0a2.25 2.25 0 01-2.25-2.25V6.75A2.25 2.25 0 016 4.5h12a2.25 2.25 0 012.25 2.25v11.25a2.25 2.25 0 01-2.25 2.25m-12 0h12" />
-                            </svg>
-                            <!-- Ikona: Kurierzy -->
-                            <svg v-else-if="item.icon === 'delivery'" class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 .999.999 0 00-.987 1.106v7.635m12-6.677a2.056 2.056 0 00-1.58-.86H14.25" />
-                            </svg>
-                            <!-- Ikona: RCP -->
-                            <svg v-else-if="item.icon === 'rcp'" class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <!-- Ikona: BI & Raporty -->
-                            <svg v-else-if="item.icon === 'bi'" class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-                            </svg>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div v-for="venue in venueTypes" :key="venue.name" class="p-6 bg-slate-50 rounded-2xl border border-slate-200/80 hover:border-amber-400 transition-all space-y-3 shadow-sm">
+                        <div class="p-3 bg-amber-500/10 text-amber-600 rounded-xl w-max">
+                            <component :is="venue.icon" class="w-6 h-6" />
                         </div>
-                        <h3 class="text-xl font-bold text-white mb-2">{{ item.title }}</h3>
-                        <p class="text-slate-400 leading-relaxed text-sm font-normal">{{ item.description }}</p>
+                        <h3 class="text-base font-bold text-slate-900 uppercase tracking-wider">{{ venue.name }}</h3>
+                        <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">{{ venue.desc }}</p>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Cennik -->
-        <section id="cennik" class="py-24">
-            <div class="max-w-7xl mx-auto px-6">
-                <div class="text-center max-w-3xl mx-auto mb-16">
-                    <h2 class="text-3xl md:text-4xl font-black text-white mb-4">Prosty cennik bez ukrytych opłat</h2>
-                    <p class="text-slate-400">Wybierz plan dopasowany do wielkości Twojej restauracji. Możesz zrezygnować w dowolnym momencie.</p>
+        <!-- PODGLĄD SYSTEMU DLA KAŻDEGO LOKALU GASTRONOMICZNEGO -->
+        <section class="max-w-7xl mx-auto px-6 py-16 space-y-12">
+            <div class="bg-gradient-to-br from-amber-500 to-amber-600 rounded-3xl p-8 sm:p-12 text-slate-950 shadow-xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                <div class="lg:col-span-7 space-y-4">
+                    <div class="inline-flex items-center space-x-1.5 px-3 py-1 bg-slate-950/10 rounded-full text-slate-950 text-xs font-extrabold uppercase tracking-wider">
+                        <Utensils class="w-4 h-4 fill-current" />
+                        <span>Dedykowane funkcje dla każdego lokalu gastronomicznego</span>
+                    </div>
+                    <h2 class="text-3xl sm:text-4xl font-black leading-tight">Błyskawiczna obsługa i wygoda pracy całego zespołu</h2>
+                    <p class="text-slate-950/80 text-base sm:text-lg leading-relaxed">
+                        Niezależnie od charakteru Twojej gastronomii, nasz system adaptuje się do Twoich potrzeb. Wymagasz szybkich modyfikatorów sosów i mięs w kebabie? Obsługujesz stoliki i dzielisz pizzę na pół? A może zarządzasz własną flotą kurierów? InGastro usprawnia pracę od przyjęcia zamówienia aż po wydanie i rozliczenie.
+                    </p>
+                    <ul class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-bold uppercase tracking-wider pt-2">
+                        <li class="flex items-center"><Check class="w-4 h-4 mr-2 text-slate-950 stroke-[3]" /> Szybkie modyfikatory dań i składników</li>
+                        <li class="flex items-center"><Check class="w-4 h-4 mr-2 text-slate-950 stroke-[3]" /> Numeracja zamówień na wynos</li>
+                        <li class="flex items-center"><Check class="w-4 h-4 mr-2 text-slate-950 stroke-[3]" /> Bony na ekrany KDS na kuchni</li>
+                        <li class="flex items-center"><Check class="w-4 h-4 mr-2 text-slate-950 stroke-[3]" /> Rozliczanie gotówki i zmian kurierów</li>
+                    </ul>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+                <div class="lg:col-span-5">
+                    <img 
+                        src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1200&q=80" 
+                        alt="Restauracja obsługa gastronomiczna" 
+                        class="rounded-2xl shadow-2xl border-4 border-white/40 object-cover h-64 sm:h-80 w-full"
+                    />
+                </div>
+            </div>
+        </section>
+
+        <!-- KALKULATOR MODUŁOWY (INTERAKTYWNY DLA KLIENTA) -->
+        <section class="max-w-6xl mx-auto px-6 py-8">
+            <div class="bg-white border border-slate-200 rounded-3xl p-8 sm:p-10 shadow-xl space-y-8">
+                <div class="text-center space-y-2">
+                    <h2 class="text-2xl sm:text-3xl font-black text-slate-900 flex items-center justify-center space-x-2">
+                        <Calculator class="w-7 h-7 text-amber-500" />
+                        <span>Kalkulator Zestawu Modułowego</span>
+                    </h2>
+                    <p class="text-slate-600 text-sm">Wybierz moduły potrzebne w Twoim lokalu i sprawdź miesięczną kwotę abonamentu:</p>
+                </div>
+
+                <!-- SIATKA MODUŁÓW -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div 
-                        v-for="plan in plans" 
-                        :key="plan.name"
+                        v-for="mod in modules" 
+                        :key="mod.key"
+                        @click="toggleModule(mod.key)"
                         :class="[
-                            'p-8 rounded-3xl border flex flex-col justify-between transition relative',
-                            plan.highlighted 
-                                ? 'bg-slate-900 border-amber-500 shadow-2xl shadow-amber-500/10' 
-                                : 'bg-slate-950 border-slate-800'
+                            'p-5 rounded-2xl border-2 transition-all cursor-pointer space-y-3 relative',
+                            selectedKeys.includes(mod.key)
+                                ? 'bg-amber-500/10 border-amber-500 shadow-md'
+                                : 'bg-slate-50 border-slate-200 hover:border-slate-300 opacity-70'
                         ]"
                     >
-                        <div v-if="plan.highlighted" class="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-amber-500 text-slate-950 font-bold text-xs rounded-full uppercase tracking-wider">
-                            Najpopularniejszy
+                        <div class="flex items-center justify-between">
+                            <div class="p-2.5 rounded-xl bg-white border border-slate-200 text-amber-600">
+                                <component :is="mod.icon" class="w-5 h-5" />
+                            </div>
+                            <span class="text-base font-black font-mono text-amber-600">+{{ mod.price }} zł <span class="text-xs text-slate-500 font-sans font-normal">/ mies.</span></span>
                         </div>
 
                         <div>
-                            <h3 class="text-2xl font-bold text-white mb-2">{{ plan.name }}</h3>
-                            <p class="text-slate-400 text-sm mb-6">{{ plan.description }}</p>
-
-                            <div class="flex items-baseline gap-1 mb-8">
-                                <span class="text-4xl font-black text-white">{{ plan.price }} zł</span>
-                                <span class="text-slate-400 text-sm">/ miesiąc + VAT</span>
-                            </div>
-
-                            <ul class="space-y-4 mb-8 text-sm">
-                                <li v-for="feat in plan.features" :key="feat" class="flex items-center gap-3 text-slate-300">
-                                    <svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
-                                    </svg>
-                                    <span>{{ feat }}</span>
-                                </li>
-                            </ul>
+                            <h3 class="text-base font-bold text-slate-900">{{ mod.name }}</h3>
+                            <p class="text-xs text-slate-600 mt-1 leading-relaxed">{{ mod.desc }}</p>
                         </div>
+                    </div>
+                </div>
 
-                        <Link 
-                            href="/register-restaurant" 
-                            :class="[
-                                'w-full py-3.5 text-center font-bold rounded-xl transition text-sm',
-                                plan.highlighted 
-                                    ? 'bg-amber-500 hover:bg-amber-400 text-slate-950' 
-                                    : 'bg-slate-900 hover:bg-slate-800 text-white border border-slate-800'
-                            ]"
-                        >
-                            Wybierz plan
-                        </Link>
+                <!-- PODSUMOWANIE KALKULATORA -->
+                <div class="bg-slate-900 text-white p-6 sm:p-8 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-6">
+                    <div>
+                        <div class="text-xs text-slate-400 font-bold uppercase tracking-wider">Szacowany abonament miesięczny:</div>
+                        <div class="text-3xl sm:text-4xl font-black font-mono text-amber-400 mt-1">
+                            {{ calculatedTotal }} <span class="text-base text-slate-400 font-sans font-normal">zł / mies. netto</span>
+                        </div>
+                        <div class="text-xs text-emerald-400 font-bold mt-1">0 zł prowizji od sprzedaży. Wybrane moduły aktywne w 14-dniowym trialu.</div>
+                    </div>
+
+                    <Link :href="route('central.register')" class="w-full sm:w-auto px-8 py-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-sm uppercase tracking-wider transition shadow-lg shadow-amber-500/20 text-center">
+                        Rozpocznij darmowy test
+                    </Link>
+                </div>
+            </div>
+        </section>
+
+        <!-- 🌟 NOWA SEKCJA: INTERAKTYWNY PODGLĄD MODUŁÓW SYSTEMU (PREVIEW / MOCKUP) -->
+        <section class="max-w-7xl mx-auto px-6 py-16 space-y-12">
+            <div class="text-center space-y-3">
+                <div class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold uppercase tracking-wider">
+                    <Layers class="w-4 h-4 text-amber-600" />
+                    <span>Przegląd funkcji i ekranów</span>
+                </div>
+                <h2 class="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">Zobacz, jak poszczególne moduły pracują w praktyce</h2>
+                <p class="text-slate-600 text-base max-w-2xl mx-auto">Kliknij w wybrany moduł poniżej, aby poznać jego szczegółowe możliwości i zobaczyć podgląd interfejsu:</p>
+            </div>
+
+            <!-- PRZYCISKI ZAKŁADEK MODUŁÓW -->
+            <div class="flex flex-wrap justify-center gap-2 border-b border-slate-200 pb-4">
+                <button 
+                    v-for="preview in modulePreviews" 
+                    :key="preview.key"
+                    @click="activePreviewModule = preview.key"
+                    :class="[
+                        'px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold uppercase tracking-wider transition flex items-center space-x-2 cursor-pointer',
+                        activePreviewModule === preview.key
+                            ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                    ]"
+                >
+                    <component :is="modules.find(m => m.key === preview.key)?.icon || Utensils" class="w-4 h-4" />
+                    <span>{{ preview.title.split('&')[0] }}</span>
+                </button>
+            </div>
+
+            <!-- KARTA DEDYKOWANA DLA AKTYWNEGO PODGLĄDU -->
+            <div class="bg-white border border-slate-200 rounded-3xl p-8 sm:p-12 shadow-xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                <div class="lg:col-span-6 space-y-6">
+                    <span class="px-3 py-1 rounded-md bg-amber-100 text-amber-900 text-xs font-black uppercase tracking-wider">
+                        {{ currentPreview.badge }}
+                    </span>
+
+                    <h3 class="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">
+                        {{ currentPreview.title }}
+                    </h3>
+
+                    <p class="text-amber-600 font-bold text-sm sm:text-base">
+                        {{ currentPreview.tagline }}
+                    </p>
+
+                    <p class="text-slate-600 text-sm sm:text-base leading-relaxed">
+                        {{ currentPreview.description }}
+                    </p>
+
+                    <ul class="space-y-2.5 pt-2">
+                        <li v-for="(bullet, idx) in currentPreview.bullets" :key="idx" class="flex items-start text-xs sm:text-sm font-bold text-slate-800">
+                            <CheckCircle2 class="w-5 h-5 text-emerald-600 mr-2.5 shrink-0 mt-0.5" />
+                            <span>{{ bullet }}</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="lg:col-span-6">
+                    <div class="relative rounded-2xl overflow-hidden border-4 border-slate-100 shadow-2xl bg-slate-900">
+                        <img 
+                            :src="currentPreview.image" 
+                            :alt="currentPreview.title"
+                            class="w-full h-80 sm:h-96 object-cover"
+                        />
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Stopka -->
-        <footer class="border-t border-slate-800/80 py-12 bg-slate-950">
-            <div class="max-w-7xl mx-auto px-6 text-center text-slate-500 text-sm">
-                <p>© {{ new Date().getFullYear() }} Savona SaaS System. Wszystkie prawa zastrzeżone.</p>
-            </div>
+        <!-- FOOTER -->
+        <footer class="bg-white border-t border-slate-200 py-8 text-center text-xs text-slate-500">
+            &copy; 2026 InGastro SaaS. Kompleksowe rozwiązania dla gastronomi małej i dużej.
         </footer>
+
     </div>
 </template>

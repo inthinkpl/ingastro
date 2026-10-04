@@ -4,7 +4,7 @@ import { Link, usePage, router } from '@inertiajs/vue3';
 import { 
     ShoppingCart, ChefHat, ShoppingBag, TrendingUp, Pizza, 
     Package, Users, Banknote, Map, Settings, LogOut, Clock,
-    Play, Pause, Square, ChevronDown, ChevronRight, UserCheck, Gift, Tag
+    Play, Pause, Square, ChevronDown, ChevronRight, UserCheck, Gift, Tag, Sparkles
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -22,10 +22,41 @@ const userPermissions = computed(() => page.props.auth?.permissions || []);
 // Dynamiczne dane restauracji oraz subskrypcji
 const restaurantName = computed(() => page.props.restaurant?.name || 'Pizzeria ERP');
 const subscription = computed(() => page.props.restaurant?.subscription || {
+    plan_id: 1,
     plan_name: 'Brak Planu',
     ends_at: 'Bezterminowo',
     status: 'expired'
 });
+
+// LOGIKA OKRESU PRÓBNEGO (TRIAL)
+const isTrialing = computed(() => subscription.value.status === 'trialing');
+
+const daysLeft = computed(() => {
+    if (!subscription.value.ends_at || subscription.value.ends_at === 'Bezterminowo') return 0;
+    
+    const end = new Date(subscription.value.ends_at);
+    const now = new Date();
+    const diffTime = end - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays > 0 ? diffDays : 0;
+});
+
+// 💳 BEZPIECZNE PRZEKIEROWANIE DO STRIPE CHECKOUT
+const redirectToStripe = (event) => {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const planId = subscription.value.plan_id || 1;
+    const checkoutUrl = `${window.location.origin}/subscription/checkout/${planId}`;
+
+    console.log('Przekierowanie do Stripe Checkout:', checkoutUrl);
+
+    // Wymuszamy bezpośrednie przejście okna przeglądarki
+    window.location.assign(checkoutUrl);
+};
 
 // MODUŁY ODBLOKOWANE W PLANIE SUBSKRYPCJI TENANTA
 const tenantFeatures = computed(() => page.props.auth?.tenant_features || []);
@@ -99,10 +130,10 @@ const toggleTeamMenu = () => {
 <template>
     <div class="min-h-screen bg-[#0B0F19] text-slate-300 flex flex-col md:flex-row font-sans antialiased">
         
-        <!-- SIDEBAR (Ukrywany gdy hideSidebar === true) -->
+        <!-- SIDEBAR -->
         <aside v-if="!hideSidebar" class="w-full md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between p-4 shrink-0 shadow-2xl">
             <div>
-                <!-- NAGŁÓWEK SIDEBARU: NAZWA RESTAURACJI + PLAN SUBSKRYPCJI -->
+                <!-- NAGŁÓWEK SIDEBARU -->
                 <div class="mb-6 px-2 py-3 border-b border-slate-800 space-y-2">
                     <div class="flex items-center justify-between">
                         <h2 class="text-base font-black text-white tracking-wide truncate max-w-[170px]" :title="restaurantName">
@@ -116,8 +147,16 @@ const toggleTeamMenu = () => {
                     <!-- KARTA STATUSU PLANU -->
                     <div class="p-2 bg-slate-950/70 border border-slate-800 rounded-xl flex items-center justify-between text-[10px]">
                         <div class="flex items-center space-x-1.5 overflow-hidden">
-                            <span class="h-2 w-2 rounded-full shrink-0" :class="subscription.status === 'active' ? 'bg-emerald-500' : 'bg-red-500'"></span>
-                            <span class="font-bold text-amber-400 truncate">{{ subscription.plan_name }}</span>
+                            <span 
+                                class="h-2 w-2 rounded-full shrink-0" 
+                                :class="
+                                    subscription.status === 'active' ? 'bg-emerald-500' :
+                                    isTrialing ? 'bg-amber-500 animate-pulse' : 'bg-red-500'
+                                "
+                            ></span>
+                            <span class="font-bold text-amber-400 truncate">
+                                {{ isTrialing ? `${subscription.plan_name} (TRIAL)` : subscription.plan_name }}
+                            </span>
                         </div>
                         <span class="text-slate-400 font-mono text-[9px] shrink-0">
                             {{ subscription.ends_at === 'Bezterminowo' ? '∞' : 'do ' + subscription.ends_at }}
@@ -195,7 +234,7 @@ const toggleTeamMenu = () => {
                     </div>
                 </div>
 
-                <!-- NAWIGACJA Z FILTRACJĄ UPRAWNIEŃ RÓL ORAZ MODUŁÓW PLANU SUBSKRYPCJI -->
+                <!-- NAWIGACJA -->
                 <nav class="space-y-1">
                     <!-- KASA POS (KELNER) -->
                     <Link 
@@ -368,6 +407,34 @@ const toggleTeamMenu = () => {
 
         <!-- WIDOK GŁÓWNY -->
         <main class="flex-1 overflow-y-auto max-h-screen flex flex-col">
+            
+            <!-- BANER INFORMACYJNY O 14-DNIOWYM OKRESIE PRÓBNYM (TRIAL) -->
+            <div 
+                v-if="isTrialing" 
+                class="bg-gradient-to-r from-amber-500/20 via-amber-500/10 to-transparent border-b border-amber-500/30 px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shrink-0 shadow-lg"
+            >
+                <div class="flex items-center space-x-2.5">
+                    <div class="p-1.5 bg-amber-500/20 border border-amber-500/40 rounded-lg shrink-0">
+                        <Sparkles class="w-4 h-4 text-amber-400 animate-pulse" />
+                    </div>
+                    <div>
+                        <span class="text-white font-bold">Korzystasz z 14-dniowego okresu próbnego!</span>
+                        <span class="text-amber-200/80 ml-1">
+                            Pozostało jeszcze <strong>{{ daysLeft }} dni</strong> dostępu do pełnego pakietu <strong>{{ subscription.plan_name }}</strong>.
+                        </span>
+                    </div>
+                </div>
+
+                <!-- PRZYCISK AKTYWACJI Z PODPIĘTĄ METODĄ REDIRECT -->
+                <button 
+                    type="button"
+                    @click="redirectToStripe"
+                    class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-4 py-2 rounded-xl transition-all shadow-md shadow-amber-500/20 text-xs tracking-wider uppercase shrink-0 cursor-pointer flex items-center space-x-1"
+                >
+                    <span>Aktywuj pełną subskrypcję</span>
+                </button>
+            </div>
+
             <!-- PASEK GÓRNY GDY SIDEBAR JEST UKRYTY -->
             <header v-if="hideSidebar" class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between shrink-0 shadow-lg">
                 <div class="flex items-center space-x-3">

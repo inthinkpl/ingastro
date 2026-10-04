@@ -12,10 +12,19 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         // 🔓 Ustawienie dozwolonych hostów dla sesji i zapytań cross-origin (CORS)
-        $middleware->trustHosts(at: ['localhost', '127.0.0.1', '.*\.localhost']);
+        $middleware->trustHosts(at: ['localhost', '127.0.0.1', '.*\.localhost', '.*\.ingastro\.pl']);
 
         // 🛡️ Włączamy obsługę domen stanowych (Sanctum / Inertia) dla subdomen .localhost
         $middleware->statefulApi();
+
+        // 💳 Wykluczenie webhooków Stripe oraz płatności z weryfikacji CSRF
+        $middleware->validateCsrfTokens(except: [
+            'stripe/*',
+            'stripe/webhook',
+            'api/webhooks/stripe',
+            'payment/webhook',
+            'payment/payu/webhook',
+        ]);
 
         // Rejestracja aliasów middleware dla ról, uprawnień, modułów oraz planów subskrypcji
         $middleware->alias([

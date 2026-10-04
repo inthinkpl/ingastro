@@ -12,6 +12,7 @@ use App\Models\RolePermission;
 use App\Http\Controllers\Admin\RolePermissionController;
 use Illuminate\Support\Carbon;
 use App\Models\SubscriptionInvoice;
+use App\Models\Plan;
 
 class SettingsController extends Controller
 {
@@ -24,6 +25,13 @@ class SettingsController extends Controller
             return $group->pluck('permission')->toArray();
         });
 
+        // 💳 Pobranie wszystkich aktywnych planów z bazy centralnej (połączenie 'mysql')
+        try {
+            $allPlans = Plan::on('mysql')->where('is_active', true)->get();
+        } catch (\Throwable $e) {
+            $allPlans = collect([]);
+        }
+
         // 💳 Informacje o planie subskrypcji oraz historii faktur z bazy centralnej
         $tenant = tenant();
         $subscriptionInfo = null;
@@ -31,7 +39,7 @@ class SettingsController extends Controller
         if ($tenant) {
             $tenant->load('plan');
 
-            // 🛡️ Bezpieczne formatowanie daty wygaśnięcia subskrypcji
+            // 🛡️️ Bezpieczne formatowanie daty wygaśnięcia subskrypcji
             $endsAtFormatted = 'Bezterminowo';
             if ($tenant->subscription_ends_at) {
                 if ($tenant->subscription_ends_at instanceof \DateTimeInterface) {
@@ -41,27 +49,33 @@ class SettingsController extends Controller
                 }
             }
 
-            // 📄 Pobranie historii faktur z bazy centralnej
-            $invoices = SubscriptionInvoice::where('tenant_id', $tenant->id)
-                ->latest('paid_at')
-                ->get()
-                ->map(fn($inv) => [
-                    'id'           => $inv->id,
-                    'number'       => $inv->number,
-                    'plan_name'    => $inv->plan_name,
-                    'amount_gross' => $inv->amount_gross,
-                    'paid_at'      => $inv->paid_at ? $inv->paid_at->format('Y-m-d H:i') : '',
-                    'status'       => $inv->status,
-                ]);
+            // 📄 Pobranie historii faktur Z BAZY CENTRALNEJ (połączenie 'mysql')
+            try {
+                $invoices = SubscriptionInvoice::on('mysql')
+                    ->where('tenant_id', (string) $tenant->id)
+                    ->latest('paid_at')
+                    ->get()
+                    ->map(fn($inv) => [
+                        'id'           => $inv->id,
+                        'number'       => $inv->number,
+                        'plan_name'    => $inv->plan_name,
+                        'amount_gross' => $inv->amount_gross,
+                        'paid_at'      => $inv->paid_at ? $inv->paid_at->format('Y-m-d H:i') : '',
+                        'status'       => $inv->status,
+                    ]);
+            } catch (\Throwable $e) {
+                $invoices = collect([]);
+            }
 
             $subscriptionInfo = [
+                'plan_id'        => $tenant->plan_id ?? 1,
                 'plan_name'      => $tenant->plan?->name ?? 'Brak planu (Starter)',
                 'price_monthly'  => $tenant->plan?->price_monthly ?? 0,
                 'status'         => $tenant->subscription_status ?? 'active',
                 'ends_at'        => $endsAtFormatted,
                 'features'       => $tenant->plan?->features ?? ['shop', 'pos'],
                 'max_menu_items' => $tenant->plan?->max_menu_items ?? 30,
-                'invoices'       => $invoices, // 👈 Przekazanie listy faktur do widoku Vue
+                'invoices'       => $invoices,
             ];
         }
 
@@ -96,8 +110,9 @@ class SettingsController extends Controller
             'rolePermissions'       => $savedPermissions,
             'authRole'              => $request->user()->role,
 
-            // 💳 Przypisanie subskrypcji dla widoku Vue
+            // 💳 Przypisanie subskrypcji oraz listy dostępnych planów dla widoku Vue
             'subscription'          => $subscriptionInfo,
+            'allPlans'              => $allPlans,
         ]);
     }
 
@@ -106,7 +121,6 @@ class SettingsController extends Controller
      */
     public function save(Request $request)
     {
-        // Pancerne reguły walidacji - pilnują kompletności danych produkcyjnych
         $validated = $request->validate([
             'restaurant_name'          => 'required|string|max:255',
             'restaurant_phone'         => 'nullable|string|max:50',
@@ -128,14 +142,12 @@ class SettingsController extends Controller
             // 🍕 Walidacja przełącznika Pizzy Pół na Pół
             'half_half_enabled'        => 'required|boolean',
             
-            // Reguła required_if gwarantuje, że jeśli wybrano bramkę 'payu', poniższe pola są obowiązkowe
             'payu_pos_id'              => 'nullable|required_if:payment_gateway,payu|string|max:100',
             'payu_client_id'           => 'nullable|required_if:payment_gateway,payu|string|max:100',
             'payu_client_secret'       => 'nullable|required_if:payment_gateway,payu|string|max:255',
             'payu_second_key'          => 'nullable|required_if:payment_gateway,payu|string|max:255',
         ]);
 
-        // Masowy zapis typu EAV (Entity-Attribute-Value) do tabeli ustawień klucz-wartość
         foreach ($validated as $key => $value) {
             SystemSetting::updateOrCreate(
                 ['key' => $key],

@@ -1,11 +1,12 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import axios from 'axios';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { 
     MapPin, Ticket, Bell, CreditCard, ShieldCheck, Tag, Sparkles, 
-    CheckCircle2, Lock, ArrowUpRight, Loader2, FileText 
+    CheckCircle2, Lock, ArrowUpRight, Loader2, FileText, Check, Star,
+    ShoppingCart, Pizza, ChefHat, Truck, PackageCheck, Gift, Clock, Calculator
 } from 'lucide-vue-next';
 
 // Komponenty cząstkowe
@@ -36,52 +37,76 @@ const props = defineProps({
     rolePermissions: { type: Object, default: () => ({}) },
     authRole: { type: String, default: 'admin' },
     
-    // 💳 Dane o planie subskrypcji oraz historii faktur
-    subscription: { type: Object, default: () => null }
+    // 💳 Dane subskrypcji oraz pobrana lista modułów z cennika w bazie centralnej
+    subscription: { type: Object, default: () => null },
+    allModules: { type: Array, default: () => [] }
 });
 
 const activeTab = ref('general');
 const isProcessingPayment = ref(false);
+
+// Mapowanie ikonek dla modułów
+const moduleIcons = {
+    pos: ShoppingCart,
+    shop: Pizza,
+    kds: ChefHat,
+    delivery: Truck,
+    inventory_bom: PackageCheck,
+    loyalty: Gift,
+    rcp: Clock,
+};
+
+// Aktualnie wybrane klucze modułów w kalkulatorze (domyślnie obecne moduły tenanta lub pusta tablica)
+const selectedModuleKeys = ref(props.subscription?.features || ['pos', 'shop', 'kds']);
+
+// Włączanie/wyłączanie modułu w kalkulatorze
+const toggleModule = (key) => {
+    if (selectedModuleKeys.value.includes(key)) {
+        if (selectedModuleKeys.value.length === 1) {
+            alert('Musisz wybrać przynajmniej jeden moduł.');
+            return;
+        }
+        selectedModuleKeys.value = selectedModuleKeys.value.filter(k => k !== key);
+    } else {
+        selectedModuleKeys.value.push(key);
+    }
+};
+
+// Obliczanie łącznej kwoty netto miesięcznie na żywo
+const calculatedTotalPrice = computed(() => {
+    if (!props.allModules || props.allModules.length === 0) return 0;
+    return props.allModules
+        .filter(m => selectedModuleKeys.value.includes(m.key))
+        .reduce((sum, m) => sum + Number(m.price_monthly || 0), 0);
+});
 
 const hasPermission = (permKey) => {
     if (props.authRole === 'admin') return true;
     return props.rolePermissions?.[props.authRole]?.includes(permKey) || false;
 };
 
-onMounted(() => {
-    if (!hasPermission('settings.general')) {
-        if (hasPermission('settings.discounts')) activeTab.value = 'discounts';
-        else if (hasPermission('settings.notifications')) activeTab.value = 'notifications';
-        else if (hasPermission('settings.payments')) activeTab.value = 'payments';
+// 💳 INICJALIZACJA STRIPE CHECKOUT DLA SKOMPONOWANEGO ZESTAWU MODUŁÓW
+const handleCheckoutModules = async () => {
+    if (selectedModuleKeys.value.length === 0) {
+        alert('Wybierz co najmniej jeden moduł, aby przejść do płatności.');
+        return;
     }
-});
 
-// Pomocnicze etykiety funkcji w czytelnym języku polskim
-const featureLabels = {
-    shop: 'Sklep E-Commerce & Zamówienia Online',
-    pos: 'System POS do przyjmowania zamówień w lokalu',
-    kds: 'Ekran Kuchenny (KDS)',
-    delivery: 'Moduł i Aplikacja dla Kurierów',
-    inventory_bom: 'Magazyn & Receptury BOM',
-    loyalty: 'Program Lojalnościowy i Kody Rabatowe',
-    rcp: 'Rejestracja Czasu Pracy (RCP)',
-    multi_location: 'Wsparcie dla wielu lokalizacji',
-    custom_domain: 'Własna domena (np. mojapizzeria.pl)',
-};
-
-const allPossibleFeatures = [
-    'shop', 'pos', 'kds', 'delivery', 'inventory_bom', 'loyalty', 'rcp', 'multi_location', 'custom_domain'
-];
-
-// Obsługa inicjalizacji sesji Stripe Checkout
-const handleCheckout = async (planId) => {
+    if (isProcessingPayment.value) return;
     isProcessingPayment.value = true;
+
     try {
-        const response = await axios.post(route('tenant.subscription.checkout'), { plan_id: planId });
+        const response = await axios.post('/subscription/checkout', { 
+            modules: selectedModuleKeys.value 
+        });
+
         if (response.data?.url) {
-            window.location.href = response.data.url;
+            window.location.assign(response.data.url);
+        } else {
+            alert('Nie udało się wygenerować sesji płatności Stripe.');
         }
     } catch (error) {
+        console.error('Błąd Stripe Checkout:', error);
         alert(error.response?.data?.message || 'Błąd inicjalizacji płatności. Skontaktuj się z obsługą.');
     } finally {
         isProcessingPayment.value = false;
@@ -113,7 +138,7 @@ const handleCheckout = async (planId) => {
                     <span>Wizytówka & Zasady</span>
                 </button>
 
-                <!-- ZAKŁADKA SUBSKRYPCJI (Dostępna dla admina) -->
+                <!-- ZAKŁADKA SUBSKRYPCJI -->
                 <button 
                     v-if="authRole === 'admin' && subscription"
                     @click="activeTab = 'subscription'"
@@ -121,7 +146,7 @@ const handleCheckout = async (planId) => {
                     class="px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider font-bold border transition-all flex items-center space-x-2 cursor-pointer"
                 >
                     <Sparkles class="w-4 h-4 text-amber-500" />
-                    <span>Subskrypcja & Plan</span>
+                    <span>Subskrypcja & Moduły</span>
                 </button>
 
                 <button 
@@ -132,20 +157,7 @@ const handleCheckout = async (planId) => {
                 >
                     <Ticket class="w-4 h-4 text-amber-500" />
                     <span>Kody Rabatowe</span>
-                    <span v-if="discountCodes.length > 0" class="bg-[#0B0F19] text-amber-400 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold">
-                        {{ discountCodes.length }}
-                    </span>
                 </button>
-
-                <!-- BEZPOŚREDNI ODNOŚNIK DO MODUŁU PROMOCJI I GRATISÓW -->
-                <Link 
-                    v-if="hasPermission('settings.discounts')"
-                    :href="route('manager.promotions.index')"
-                    class="px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider font-bold border transition-all flex items-center space-x-2 cursor-pointer bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:border-amber-500/50"
-                >
-                    <Tag class="w-4 h-4 text-amber-500" />
-                    <span>Promocje & Gratisy</span>
-                </Link>
 
                 <button 
                     v-if="hasPermission('settings.notifications')"
@@ -178,7 +190,7 @@ const handleCheckout = async (planId) => {
                 </button>
             </div>
 
-            <!-- DYNAMICZNIE ŁADOWANE SEKCJE (PARTIALS) -->
+            <!-- DYNAMICZNIE ŁADOWANE SEKCJE -->
             <main>
                 <GeneralSettingsForm 
                     v-if="activeTab === 'general' && hasPermission('settings.general')"
@@ -198,87 +210,103 @@ const handleCheckout = async (planId) => {
                     :payu-second-key="payuSecondKey"
                 />
 
-                <!-- SEKCJA SUBSKRYPCJI TENANTA -->
+                <!-- 💳 SEKCJA SUBSKRYPCJI Z KALKULATOREM MODUŁÓW (A LA CARTE) -->
                 <div v-if="activeTab === 'subscription' && subscription" class="space-y-6">
-                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-                        
-                        <!-- NAGŁÓWEK SUBSKRYPCJI -->
-                        <div class="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 pb-6 gap-4">
+                    
+                    <!-- KARTA STATUSU KONTROLNEGO -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
                             <div>
-                                <div class="flex items-center space-x-3 mb-1">
-                                    <h2 class="text-2xl font-black text-white">Plan: {{ subscription.plan_name }}</h2>
+                                <div class="flex items-center space-x-2">
+                                    <h2 class="text-lg font-black text-white">Status Abonamentu</h2>
                                     <span :class="[
-                                        'px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border',
+                                        'px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border',
                                         subscription.status === 'active' 
                                             ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                                            : 'bg-red-500/10 text-red-400 border-red-500/20'
+                                            : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                                     ]">
-                                        {{ subscription.status === 'active' ? 'Aktywny' : 'Wygaśnięta' }}
+                                        {{ subscription.status === 'active' ? 'Aktywny' : subscription.status === 'trialing' ? 'Okres Próbny' : 'Wygaśnięta' }}
                                     </span>
                                 </div>
-                                <p class="text-slate-400 text-sm">
-                                    Miesięczny koszt opłaty abonamentowej: <span class="text-amber-400 font-bold font-mono">{{ subscription.price_monthly }} zł / mies.</span>
+                                <p class="text-xs text-slate-400 mt-1">
+                                    Ważność do: <span class="text-amber-400 font-mono font-bold">{{ subscription.ends_at }}</span>
                                 </p>
                             </div>
+                        </div>
 
-                            <div class="flex items-center space-x-3">
-                                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-left md:text-right">
-                                    <div class="text-[10px] text-slate-500 uppercase font-bold mb-0.5">Ważność subskrypcji</div>
-                                    <div class="text-sm font-mono font-bold text-amber-500">
-                                        {{ subscription.ends_at }}
+                        <!-- KALKULATOR MODUŁÓW -->
+                        <div class="space-y-4 pt-2">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center space-x-2">
+                                        <Calculator class="w-4 h-4 text-amber-500" />
+                                        <span>Skomponuj własny zestaw modułów:</span>
+                                    </h3>
+                                    <p class="text-xs text-slate-400 mt-0.5">Klikaj w moduły poniżej, aby je dodać lub usunąć z miesięcznej subskrypcji.</p>
+                                </div>
+                            </div>
+
+                            <!-- SIATKA MODUŁÓW CENNIKA -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                <div 
+                                    v-for="mod in allModules" 
+                                    :key="mod.id"
+                                    @click="toggleModule(mod.key)"
+                                    :class="[
+                                        'p-4 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-3 relative',
+                                        selectedModuleKeys.includes(mod.key)
+                                            ? 'bg-amber-500/10 border-amber-500 text-white shadow-lg shadow-amber-500/5'
+                                            : 'bg-slate-950/60 border-slate-800 text-slate-500 opacity-60 hover:opacity-100'
+                                    ]"
+                                >
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-2">
+                                            <div class="p-2 bg-slate-900 rounded-lg text-amber-400 border border-slate-800">
+                                                <component :is="moduleIcons[mod.key] || Sparkles" class="w-4 h-4" />
+                                            </div>
+                                            <span class="text-xs font-bold text-white">{{ mod.name }}</span>
+                                        </div>
+
+                                        <span class="text-xs font-mono font-bold text-amber-400">
+                                            +{{ Number(mod.price_monthly).toFixed(2) }} zł
+                                        </span>
+                                    </div>
+
+                                    <p class="text-[11px] text-slate-400 leading-relaxed">{{ mod.description }}</p>
+
+                                    <div class="flex items-center justify-between pt-2 border-t border-slate-800/60">
+                                        <span class="text-[10px] font-bold uppercase tracking-wider" :class="selectedModuleKeys.includes(mod.key) ? 'text-emerald-400' : 'text-slate-500'">
+                                            {{ selectedModuleKeys.includes(mod.key) ? 'Wybrany' : 'Kliknij aby dodać' }}
+                                        </span>
+                                        <div class="w-4 h-4 rounded-md flex items-center justify-center border" :class="selectedModuleKeys.includes(mod.key) ? 'bg-amber-500 border-amber-500 text-slate-950' : 'border-slate-700 bg-slate-900'">
+                                            <Check v-if="selectedModuleKeys.includes(mod.key)" class="w-3 h-3 stroke-[3]" />
+                                        </div>
                                     </div>
                                 </div>
+                            </div>
 
-                                <!-- 📄 PRZYCISK POBIERANIA BIEŻĄCEJ FAKTURY PDF -->
-                                <a 
-                                    :href="route('admin.subscription.invoice.download', { invoice: 'latest' })"
-                                    target="_blank"
-                                    class="px-4 py-3.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-bold rounded-xl text-xs uppercase tracking-wider transition flex items-center space-x-2 cursor-pointer shrink-0"
-                                    title="Pobierz fakturę za subskrypcję w PDF"
-                                >
-                                    <FileText class="w-4 h-4 text-amber-400" />
-                                    <span>Faktura PDF</span>
-                                </a>
+                            <!-- PODSUMOWANIE MIESIĘCZNE I PRZYCISK PŁATNOŚCI STRIPE -->
+                            <div class="p-5 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+                                <div>
+                                    <div class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Miesięczny koszt Twojego zestawu:</div>
+                                    <div class="text-2xl font-black font-mono text-amber-400">
+                                        {{ calculatedTotalPrice.toFixed(2) }} <span class="text-xs text-slate-400 font-sans font-normal">zł / mies. netto</span>
+                                    </div>
+                                    <div class="text-[10px] text-slate-400 mt-0.5">Liczba wybranych modułów: <strong class="text-white">{{ selectedModuleKeys.length }}</strong></div>
+                                </div>
 
                                 <button 
-                                    @click="handleCheckout(subscription.plan_id || 1)"
-                                    :disabled="isProcessingPayment"
-                                    class="px-5 py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider transition shadow-lg shadow-amber-500/10 flex items-center space-x-2 disabled:opacity-50 cursor-pointer"
+                                    @click="handleCheckoutModules"
+                                    :disabled="isProcessingPayment || selectedModuleKeys.length === 0"
+                                    class="w-full sm:w-auto px-6 py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider transition shadow-lg shadow-amber-500/20 disabled:opacity-50 flex items-center justify-center space-x-2 cursor-pointer"
                                 >
                                     <Loader2 v-if="isProcessingPayment" class="w-4 h-4 animate-spin" />
                                     <ArrowUpRight v-else class="w-4 h-4" />
-                                    <span>{{ subscription.status === 'active' ? 'Odnów Plan' : 'Opłać Subskrypcję' }}</span>
+                                    <span>Opłać Zestaw Modułów</span>
                                 </button>
                             </div>
-                        </div>
 
-                        <!-- MODUŁY W PLANIE -->
-                        <div>
-                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Moduły i funkcje przydzielone do konta:</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                <div 
-                                    v-for="featKey in allPossibleFeatures" 
-                                    :key="featKey"
-                                    :class="[
-                                        'p-4 rounded-xl border flex items-center justify-between text-xs font-bold transition',
-                                        subscription.features?.includes(featKey)
-                                            ? 'bg-slate-950 border-slate-800 text-white'
-                                            : 'bg-slate-950/40 border-slate-900 text-slate-600 opacity-60'
-                                    ]"
-                                >
-                                    <span>{{ featureLabels[featKey] || featKey }}</span>
-                                    <span v-if="subscription.features?.includes(featKey)" class="flex items-center text-emerald-400 font-bold">
-                                        <CheckCircle2 class="w-4 h-4 mr-1 text-emerald-400" />
-                                        Dostępny
-                                    </span>
-                                    <span v-else class="flex items-center text-slate-600 font-semibold">
-                                        <Lock class="w-3.5 h-3.5 mr-1 text-slate-600" />
-                                        Brak w planie
-                                    </span>
-                                </div>
-                            </div>
                         </div>
-
                     </div>
 
                     <!-- SEKCJA HISTORII FAKTUR VAT -->
@@ -299,11 +327,10 @@ const handleCheckout = async (planId) => {
                                 <thead class="bg-slate-950 text-slate-400 font-bold uppercase border-b border-slate-800">
                                     <tr>
                                         <th class="p-3">Numer Faktury</th>
-                                        <th class="p-3">Wykupiony Plan</th>
+                                        <th class="p-3">Wykupiony Plan / Zestaw</th>
                                         <th class="p-3">Data Opłacenia</th>
                                         <th class="p-3">Kwota Brutto</th>
                                         <th class="p-3">Status</th>
-                                        <th class="p-3 text-right">Dokument</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-800">
@@ -317,34 +344,13 @@ const handleCheckout = async (planId) => {
                                                 Opłacona
                                             </span>
                                         </td>
-                                        <td class="p-3 text-right">
-                                            <a 
-                                                :href="route('admin.subscription.invoice.download', { invoice: invoice.id })"
-                                                target="_blank"
-                                                class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-bold rounded-lg text-xs transition inline-flex items-center space-x-1.5 cursor-pointer"
-                                            >
-                                                <FileText class="w-3.5 h-3.5" />
-                                                <span>Pobierz PDF</span>
-                                            </a>
-                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
 
-                        <!-- KOMUNIKAT BRAKU FAKTUR -->
                         <div v-else class="p-6 bg-slate-950/60 rounded-xl border border-slate-800/80 text-center space-y-3">
                             <p class="text-xs text-slate-400">Brak zarejestrowanych historycznych faktur w bazie systemowej.</p>
-                            <div>
-                                <a 
-                                    :href="route('admin.subscription.invoice.download', { invoice: 'latest' })"
-                                    target="_blank"
-                                    class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition inline-flex items-center space-x-2 cursor-pointer shadow-lg shadow-amber-500/10"
-                                >
-                                    <FileText class="w-4 h-4" />
-                                    <span>Pobierz Bieżącą Fakturę VAT (PDF)</span>
-                                </a>
-                            </div>
                         </div>
                     </div>
 

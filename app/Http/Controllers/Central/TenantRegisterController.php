@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Central;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
+use App\Models\Plan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -31,24 +32,30 @@ class TenantRegisterController extends Controller
             'admin_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'plan_id'  => ['nullable', 'exists:plans,id'], // Opcjonalny wybór planu z formularza
         ]);
 
         $subdomain = Str::slug($validated['subdomain']);
         $centralHost = config('app.central_domain', 'localhost');
         $fullDomain = "{$subdomain}.{$centralHost}";
 
-        // 1. Tworzenie Tenanta i przydzielenie domeny
+        // Pobieramy wybrany plan lub pierwszy dostępny z bazy centralnej jako domyślny
+        $defaultPlanId = $validated['plan_id'] ?? Plan::first()?->id;
+
+        // 1. Tworzenie Tenanta z 14-dniowym okresem próbnym (Trialing)
         $tenant = Tenant::create([
-            'id' => $subdomain,
-            'tenancy_db_name' => 'tenant_' . $subdomain,
+            'id'                   => $subdomain,
+            'tenancy_db_name'      => 'tenant_' . $subdomain,
+            'plan_id'              => $defaultPlanId,
+            'subscription_status'  => 'trialing',            // 👈 Aktywujemy trial
+            'subscription_ends_at' => now()->addDays(14),    // 👈 Daty ważności: 14 dni od teraz
         ]);
 
         $tenant->createDomain(['domain' => $fullDomain]);
 
-        // 2. Kopiowanie plików z wykorzystaniem kontekstu tenanta lub bezpośredniej ścieżki pakietu
+        // 2. Kopiowanie plików z wykorzystaniem kontekstu tenanta
         $sourcePath = storage_path('app/public/products');
         
-        // Sprawdzamy oba warianty ścieżki (z podkreślnikiem i bez, zależnie od konfiguracji suffix_base)
         $tenantStorageDir = storage_path("tenant_{$subdomain}/app/public/products");
         if (!File::exists(storage_path("tenant_{$subdomain}"))) {
             $tenantStorageDir = storage_path("tenant{$subdomain}/app/public/products");
@@ -62,10 +69,10 @@ class TenantRegisterController extends Controller
         // 3. Inicjalizacja danych w bazie tenanta
         $tenant->run(function () use ($validated) {
             \App\Models\User::create([
-                'name' => $validated['admin_name'],
-                'email' => $validated['email'],
+                'name'     => $validated['admin_name'],
+                'email'    => $validated['email'],
                 'password' => bcrypt($validated['password']),
-                'role' => 'admin',
+                'role'     => 'admin',
             ]);
 
             \Illuminate\Support\Facades\DB::table('system_settings')->updateOrInsert(

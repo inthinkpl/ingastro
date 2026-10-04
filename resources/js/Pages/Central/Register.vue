@@ -34,7 +34,7 @@ const submit = () => {
 </script>
 
 <template>
-    <Head title="Uruchom własną pizzerię - Savona SaaS" />
+    <Head title="Uruchom własny lokal z ingastro" />
 
     <div class="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col justify-center items-center p-4 sm:p-6 relative overflow-hidden">
         <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-500/10 via-transparent to-transparent pointer-events-none"></div>
@@ -63,7 +63,7 @@ const submit = () => {
             <form @submit.prevent="submit" class="space-y-5">
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-                        Nazwa Pizzerii / Restauracji
+                        Nazwa Lokalu / Restauracji
                     </label>
                     <input 
                         v-model="form.restaurant_name" 

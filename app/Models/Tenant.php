@@ -6,20 +6,28 @@ use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDomains;
+use Laravel\Cashier\Billable;
+use Laravel\Cashier\Subscription;
 
 class Tenant extends BaseTenant implements TenantWithDatabase
 {
+    use Billable;
     use HasDatabase, HasDomains;
 
     /**
-     * Rzutowanie typów kolumn (automatyczna konwersja pola daty na instancję Carbon/DateTime)
+     * 🛡️ Wymuszenie połączenia z bazą centralną dla modelu Tenanta i Cashiera!
+     */
+    protected $connection = 'mysql';
+
+    /**
+     * Rzutowanie typów kolumn
      */
     protected $casts = [
         'subscription_ends_at' => 'datetime',
     ];
 
     /**
-     * Wprowadź tutaj dodatkowe kolumny, które chcesz przechowywać w bazie centralnej dla pizzerii.
+     * Wprowadź tutaj dodatkowe kolumny przechowywane w bazie centralnej.
      */
     public static function getCustomColumns(): array
     {
@@ -41,23 +49,73 @@ class Tenant extends BaseTenant implements TenantWithDatabase
      */
     public function plan()
     {
-        return $this->belongsTo(Plan::class);
+        return $this->belongsTo(Plan::class, 'plan_id');
     }
 
     /**
-     * Sprawdza, czy tenant ma aktywną subskrypcję i dostęp do podanej funkcji.
+     * 📄 Relacja do faktur subskrypcyjnych w bazie centralnej
+     */
+    public function invoices()
+    {
+        return $this->hasMany(SubscriptionInvoice::class, 'tenant_id')
+                    ->setConnection('mysql')
+                    ->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * 🛡️ Nadpisanie relacji Cashiera dla subskrypcji — zawsze wymuszamy bazę centralną (mysql)
+     */
+    public function subscriptions()
+    {
+        return $this->hasMany(Subscription::class, $this->getForeignKey())
+                    ->setConnection('mysql')
+                    ->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * 🛡️ Nadpisanie domyślnego połączenia Cashiera
+     */
+    public function getConnectionName()
+    {
+        return 'mysql';
+    }
+
+    /**
+     * Sprawdza, czy tenant ma dostęp do podanej funkcji (wspiera okres próbny i datę wygaśnięcia).
      */
     public function hasFeature(string $feature): bool
     {
-        if (!$this->plan || $this->subscription_status !== 'active') {
+        $status = $this->subscription_status ?? 'expired';
+        $isOnTrial = in_array($status, ['on_trial', 'trialing'], true);
+
+        // Jeśli subskrypcja nie jest aktywna ani w trakcie okresu próbnego -> brak dostępu
+        if ($status !== 'active' && !$isOnTrial) {
             return false;
         }
 
-        return in_array($feature, $this->plan->features ?? [], true);
+        // 🛡️ W trakcie okresu próbnego (trial) udostępniamy pełny pakiet funkcji
+        if ($isOnTrial) {
+            return true;
+        }
+
+        // 🛡️ Automatyczne dociągnięcie planu, jeśli relacja nie została wcześniej załadowana
+        $this->loadMissing('plan');
+
+        if (!$this->plan) {
+            return false;
+        }
+
+        $features = $this->plan->features ?? [];
+
+        if (is_string($features)) {
+            $features = json_decode($features, true) ?? [];
+        }
+
+        return is_array($features) && in_array($feature, $features, true);
     }
 
     /**
-     * Zwraca URL do pliku ze storage tenanta serwowanego przez /tenantasset/
+     * Zwraca URL do pliku ze storage tenanta
      */
     public static function asset(string $path): string
     {
