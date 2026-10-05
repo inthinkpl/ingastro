@@ -95,8 +95,10 @@ const venueTypes = [
 const selectedKeys = ref(['pos', 'shop', 'kds']);
 
 const toggleModule = (key) => {
+    // 🔒 Blokujemy odznaczanie modułu POS - to rdzeń systemu
+    if (key === 'pos') return;
+
     if (selectedKeys.value.includes(key)) {
-        if (selectedKeys.value.length === 1) return;
         selectedKeys.value = selectedKeys.value.filter(k => k !== key);
     } else {
         selectedKeys.value.push(key);
@@ -251,12 +253,13 @@ const calculatedTotal = computed(() => {
 
                 <!-- SIATKA MODUŁÓW -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div 
+                   <div 
                         v-for="mod in modules" 
                         :key="mod.key"
                         @click="toggleModule(mod.key)"
                         :class="[
-                            'p-5 rounded-2xl border-2 transition-all cursor-pointer space-y-3 relative',
+                            'p-5 rounded-2xl border-2 transition-all space-y-3 relative',
+                            mod.key === 'pos' ? 'cursor-default' : 'cursor-pointer',
                             selectedKeys.includes(mod.key)
                                 ? 'bg-amber-500/10 border-amber-500 shadow-md'
                                 : 'bg-slate-50 border-slate-200 hover:border-slate-300 opacity-70'
@@ -270,8 +273,13 @@ const calculatedTotal = computed(() => {
                         </div>
 
                         <div>
-                            <h3 class="text-base font-bold text-slate-900">{{ mod.name }}</h3>
-                            <p class="text-xs text-slate-600 mt-1 leading-relaxed">{{ mod.desc }}</p>
+                            <h3 class="text-base font-bold text-slate-900 flex items-center flex-wrap gap-2">
+                                {{ mod.name }}
+                                <span v-if="mod.key === 'pos'" class="text-[9px] bg-amber-500 text-slate-950 px-2 py-0.5 rounded-sm uppercase tracking-wider font-black">
+                                    Rdzeń Systemu
+                                </span>
+                            </h3>
+                            <p class="text-xs text-slate-600 mt-1.5 leading-relaxed">{{ mod.desc }}</p>
                         </div>
                     </div>
                 </div>

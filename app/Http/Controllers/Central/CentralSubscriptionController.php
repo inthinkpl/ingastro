@@ -8,6 +8,8 @@ use App\Models\SystemModule;
 use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+// Dodany import potrzebny po odkomentowaniu wysyłki maila z fakturą:
+use App\Services\SaaSMailer; 
 
 class CentralSubscriptionController extends Controller
 {
@@ -167,6 +169,38 @@ class CentralSubscriptionController extends Controller
                         'subscription_status'  => $newStatus,
                         'subscription_ends_at' => \Carbon\Carbon::createFromTimestamp($subscription->current_period_end),
                     ]);
+                }
+                break;
+
+            case 'invoice.payment_succeeded':
+                $invoice = $event->data->object;
+                $customerId = $invoice->customer;
+                
+                $tenant = Tenant::on('mysql')->where('stripe_customer_id', $customerId)->first();
+
+                if ($tenant) {
+                    /* =========================================================================
+                     * ODKOMENTUJ TEN BLOK KIEDY WDROŻYSZ GENEROWANIE PLIKU PDF FAKTURY
+                     * =========================================================================
+                     * W tym miejscu musisz mieć logikę generującą plik faktury (albo pobierającą go ze Stripe).
+                     * Przykładowo, jeśli masz wygenerowany plik pod zmienną $pdfPath:
+                     */
+
+                    /*
+                    $pdfPath = storage_path('app/invoices/' . $invoice->number . '.pdf');
+                    // ... kod zapisujący plik PDF w $pdfPath ...
+
+                    $tenant->run(function () use ($invoice, $pdfPath) {
+                        $admin = \App\Models\User::where('role', 'admin')->first();
+                        
+                        if ($admin) {
+                            SaaSMailer::send('invoice_generated', $admin->email, [
+                                'invoice_number' => $invoice->number,
+                                'invoice_amount' => number_format($invoice->amount_paid / 100, 2, ',', ' ')
+                            ], [$pdfPath]); // 👈 Przekazujemy ścieżkę do pliku w tablicy
+                        }
+                    });
+                    */
                 }
                 break;
 

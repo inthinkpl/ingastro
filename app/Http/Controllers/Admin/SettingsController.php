@@ -12,7 +12,7 @@ use App\Models\RolePermission;
 use App\Http\Controllers\Admin\RolePermissionController;
 use Illuminate\Support\Carbon;
 use App\Models\SubscriptionInvoice;
-use App\Models\Plan;
+use App\Models\SystemModule; // 👈 POBIERAMY MODEL MODUŁÓW SYSTEMOWYCH
 
 class SettingsController extends Controller
 {
@@ -25,21 +25,22 @@ class SettingsController extends Controller
             return $group->pluck('permission')->toArray();
         });
 
-        // 💳 Pobranie wszystkich aktywnych planów z bazy centralnej (połączenie 'mysql')
+        // 💳 Pobranie wszystkich aktywnych modułów z cennikiem z bazy centralnej (połączenie 'mysql')
         try {
-            $allPlans = Plan::on('mysql')->where('is_active', true)->get();
+            $allModules = SystemModule::on('mysql')
+                ->where('is_active', true)
+                ->orderBy('sort_order', 'asc')
+                ->get();
         } catch (\Throwable $e) {
-            $allPlans = collect([]);
+            $allModules = collect([]);
         }
 
-        // 💳 Informacje o planie subskrypcji oraz historii faktur z bazy centralnej
+        // 💳 Informacje o subskrypcji oraz historii faktur z bazy centralnej
         $tenant = tenant();
         $subscriptionInfo = null;
 
         if ($tenant) {
-            $tenant->load('plan');
-
-            // 🛡️️ Bezpieczne formatowanie daty wygaśnięcia subskrypcji
+            // 🛡 Bezpieczne formatowanie daty wygaśnięcia subskrypcji
             $endsAtFormatted = 'Bezterminowo';
             if ($tenant->subscription_ends_at) {
                 if ($tenant->subscription_ends_at instanceof \DateTimeInterface) {
@@ -67,15 +68,17 @@ class SettingsController extends Controller
                 $invoices = collect([]);
             }
 
+            // Wrzucamy do widoku zapisane klucze aktywnych modułów z pola 'enabled_features'
+            $enabledFeatures = $tenant->enabled_features ?? ['pos', 'shop', 'kds'];
+            if (is_string($enabledFeatures)) {
+                $enabledFeatures = json_decode($enabledFeatures, true) ?? ['pos', 'shop', 'kds'];
+            }
+
             $subscriptionInfo = [
-                'plan_id'        => $tenant->plan_id ?? 1,
-                'plan_name'      => $tenant->plan?->name ?? 'Brak planu (Starter)',
-                'price_monthly'  => $tenant->plan?->price_monthly ?? 0,
-                'status'         => $tenant->subscription_status ?? 'active',
-                'ends_at'        => $endsAtFormatted,
-                'features'       => $tenant->plan?->features ?? ['shop', 'pos'],
-                'max_menu_items' => $tenant->plan?->max_menu_items ?? 30,
-                'invoices'       => $invoices,
+                'status'   => $tenant->subscription_status ?? 'active',
+                'ends_at'  => $endsAtFormatted,
+                'features' => $enabledFeatures,
+                'invoices' => $invoices,
             ];
         }
 
@@ -110,9 +113,9 @@ class SettingsController extends Controller
             'rolePermissions'       => $savedPermissions,
             'authRole'              => $request->user()->role,
 
-            // 💳 Przypisanie subskrypcji oraz listy dostępnych planów dla widoku Vue
+            // 💳 Przypisanie subskrypcji oraz pobranej listy modułów dla kalkulatora w widoku Vue
             'subscription'          => $subscriptionInfo,
-            'allPlans'              => $allPlans,
+            'allModules'            => $allModules, // 👈 PRZEKAZANIE KOLEKCJI SYSTEMMODULE
         ]);
     }
 

@@ -127,17 +127,11 @@ Route::middleware([
         Route::get('/dashboard', function () { return Inertia::render('Dashboard'); })->name('dashboard');
 
         /*
-         * ─── 💳 INICJALIZACJA PŁATNOŚCI ZA SUBSKRYPCJĘ SAAS DLA TENANTA ───
+         * ─── 💳 INICJALIZACJA PŁATNOŚCI ZA SUBSKRYPCJĘ SAAS DLA TENANTA (A LA CARTE) ───
          */
         Route::middleware(['role:admin'])->group(function () {
-            // 1. Trasa GET dla kliknięć w banerze i bezpośrednich nawigacji
-            Route::get('/subscription/checkout/{planId}', [SubscriptionController::class, 'checkout'])->name('subscription.checkout');
-            
-            // 2. Trasa POST dla zapytań Axios/AJAX
-            Route::post('/subscription/checkout', [CentralSubscriptionController::class, 'checkoutStripe'])->name('subscription.checkout.post');
-            
-            // 3. Aliasy wstecznej kompatybilności
-            Route::post('/tenant/subscription/checkout', [CentralSubscriptionController::class, 'checkoutStripe'])->name('tenant.subscription.checkout');
+            // Trasa POST dla zapytań Axios/AJAX ze skomponowanym zestawem modułów
+            Route::post('/subscription/checkout', [CentralSubscriptionController::class, 'checkoutStripe'])->name('tenant.subscription.checkout');
         });
 
         /*
@@ -194,7 +188,7 @@ Route::middleware([
         });
 
         /*
-         * ─── MODUŁ MENEDŻERA (Zarządzanie pizzerią) ───
+         * ─── MODUŁ MENEDŻERA ───
          */
         Route::middleware(['role:manager,admin'])->prefix('manager')->name('manager.')->group(function () {
 

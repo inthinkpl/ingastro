@@ -32,7 +32,7 @@ foreach ($centralDomains as $index => $domain) {
             $registerPost->name('central.register.store');
         }
 
-        // 💳 Przekierowanie do Stripe Checkout dla Modułów
+        // 💳 Przekierowanie do Stripe Checkout dla Modułów (A la Carte)
         $checkoutRoute = Route::post('/subscription/checkout', [CentralSubscriptionController::class, 'checkoutStripe'])
             ->middleware(['auth']);
         if ($index === 0) $checkoutRoute->name('subscription.checkout');
@@ -46,11 +46,17 @@ foreach ($centralDomains as $index => $domain) {
             $dashRoute = Route::get('/', [CentralAdminController::class, 'index']);
             $storeRoute = Route::post('/tenants', [CentralAdminController::class, 'storeTenant']);
             $updateRoute = Route::put('/tenants/{tenant}/subscription', [CentralAdminController::class, 'updateTenantSubscription']);
+            $updateModuleRoute = Route::put('/modules/{module}', [CentralAdminController::class, 'updateModule']);
+            $updateEmailRoute = Route::put('/email-templates/{id}', [CentralAdminController::class, 'updateEmailTemplate']);
+            $testEmailRoute = Route::post('/email-templates/{id}/test', [CentralAdminController::class, 'sendTestEmail']);
 
             if ($index === 0) {
                 $dashRoute->name('central.admin.dashboard');
                 $storeRoute->name('central.admin.tenants.store');
                 $updateRoute->name('central.admin.tenants.subscription.update');
+                $updateModuleRoute->name('central.admin.modules.update');
+                $updateEmailRoute->name('central.admin.email-templates.update');
+                $testEmailRoute->name('central.admin.email-templates.test');
             }
         });
 
