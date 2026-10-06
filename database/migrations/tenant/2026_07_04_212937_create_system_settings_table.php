@@ -20,7 +20,7 @@ return new class extends Migration
         DB::table('system_settings')->insert([
             [
                 'key' => 'restaurant_name',
-                'value' => 'Pizzeria Savona',
+                'value' => 'Ingastro',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],

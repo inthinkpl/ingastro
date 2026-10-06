@@ -29,7 +29,7 @@ class OrderStatusPushNotification extends Notification implements ShouldQueue
         // 1. Pobranie szablonu z bazy danych
         $setting = NotificationSetting::where('status_key', $this->statusKey)->first();
 
-        $titleTemplate = $setting?->title_template ?? 'Pizzeria Savona 🍕';
+        $titleTemplate = $setting?->title_template ?? 'Ingastro';
         $bodyTemplate  = $setting?->body_template ?? 'Zmiana statusu zamówienia #{order_id}';
 
         // 2. Bezpieczna podmiana dynamicznych pól z modelu Order

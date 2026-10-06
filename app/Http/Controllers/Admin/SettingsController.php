@@ -83,7 +83,7 @@ class SettingsController extends Controller
         }
 
         return Inertia::render('Admin/Settings', [
-            'restaurantName'        => SystemSetting::get('restaurant_name', 'Pizzeria Savona'),
+            'restaurantName'        => SystemSetting::get('restaurant_name', 'Ingastro'),
             'restaurantPhone'       => SystemSetting::get('restaurant_phone', ''),
             'restaurantAddress'     => SystemSetting::get('restaurant_address', ''),
             'minOrderAmount'        => (float) SystemSetting::get('min_order_amount', 40.00),

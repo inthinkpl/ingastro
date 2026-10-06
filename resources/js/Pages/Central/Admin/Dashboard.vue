@@ -129,7 +129,8 @@ const submitEditEmail = () => {
 };
 
 const sendTestEmail = () => {
-    testEmailForm.post(route('central.admin.email-templates.test', editEmailForm.id), {
+    // 👇 ZMIANA TUTAJ: Używamy backticków (`) i względnej ścieżki zaczynającej się od ukośnika
+    testEmailForm.post(`/super-admin/email-templates/${editEmailForm.id}/test`, {
         preserveScroll: true,
         onSuccess: () => {
             alert(`Wysłano test na ${testEmailForm.test_email}!`);
